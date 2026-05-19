@@ -87,9 +87,9 @@ void task_sd(void *pvParameters) {
     ESP_LOGI(TAG_SD, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
 
     /* Create log file */
-    // ADICIONAR NVS COUNTER
     char log_name[FILENAME_LENGTH];
-    snprintf(log_name, FILENAME_LENGTH, "%s/test%d.bin", SD_MOUNT, 12345);
+    snprintf(log_name, FILENAME_LENGTH, "%s/test%d.bin", SD_MOUNT, file_counter_g.file_numSD);
+    ESP_LOGI(TAG_SD, "Creating file %s", log_name);
 
     FILE *f = fopen(log_name, "wb");
     if (!f) {
@@ -164,10 +164,16 @@ unmount:
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
 
-    sys_event_t evt = EVT_SAVE_DONE;
+    sys_event_t evt = EVT_SD_DONE;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
+}
+
+void task_nvs(void *pvParameters) {
+
+    /* Wait for SAVE_DONE */
+    xEventGroupWaitBits(xSystemEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
 }
 
 static void lora_init(sx126x_handle_t *lora_handle) {

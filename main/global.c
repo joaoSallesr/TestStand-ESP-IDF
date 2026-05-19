@@ -1,9 +1,10 @@
 #include "global.h"
 
 // DATA MANAGEMENT
-ads_data_t *ads_data_g = NULL;
-max_data_t *max_data_g = NULL;
-sys_data_t  sys_data_g = {0};
+ads_data_t    *ads_data_g     = NULL;
+max_data_t    *max_data_g     = NULL;
+sys_data_t     sys_data_g     = {0};
+file_counter_t file_counter_g = {0};
 
 // MUTEXES
 // SemaphoreHandle_t xDATAMutex = NULL;

@@ -67,6 +67,37 @@ static void setup_peripherals(void) {
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
 }
 
+static void setup_nvs(bool format_mode) {
+    esp_err_t err = nvs_flash_init();
+
+    if (err != ESP_OK) {
+        ESP_LOGE("NVS", "%s, erasing NVS partition...", esp_err_to_name(err));
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
+
+    nvs_handle_t nvs_handle;
+    ESP_LOGI("NVS", "Opening Non-Volatile Storage (NVS) handle... ");
+    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
+
+    int32_t sd_num  = 0;
+    int32_t lfs_num = 0;
+
+    nvs_get_i32(nvs_handle, "sd_counter", &sd_num);
+    nvs_get_i32(nvs_handle, "lfs_counter", &lfs_num);
+
+    if (format_mode) {
+        sd_num  = 0;
+        lfs_num = 0;
+    }
+
+    nvs_close(nvs_handle);
+
+    file_counter_g.file_numSD  = sd_num;
+    file_counter_g.file_numLFS = lfs_num;
+    file_counter_g.format      = format_mode;
+}
+
 void task_status(void *pvParameters) {
     sys_event_t evt;
     while (true) {
@@ -100,9 +131,25 @@ void task_status(void *pvParameters) {
         xEventGroupSetBits(xSystemEvent, SAVE_DATA);
         break;
 
+    case EVT_SD_DONE:
+        ESP_LOGI(TAG_SYS, "SD DONE");
+        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
+        break;
+
+    case EVT_LFS_DONE:
+        ESP_LOGI(TAG_SYS, "LFS DONE");
+        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
+        break;
+
     case EVT_SAVE_DONE:
-        ESP_LOGI(TAG_SYS, "SAVE_DATA -> SEND_DATA");
+        ESP_LOGI(TAG_SYS, "SAVE_DATA -> NVS_EDIT");
         xEventGroupClearBits(xSystemEvent, SAVE_DATA);
+        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
+        break;
+
+    case EVT_NVS_DONE:
+        ESP_LOGI(TAG_SYS, "NVS_EDIT -> SEND_DATA");
+        xEventGroupClearBits(xSystemEvent, NVS_EDIT);
         xEventGroupSetBits(xSystemEvent, SEND_DATA);
         break;
 

@@ -3,9 +3,10 @@
 #include "header.h"
 
 // DATA MANAGEMENT
-extern ads_data_t *ads_data_g;
-extern max_data_t *max_data_g;
-extern sys_data_t  sys_data_g;
+extern ads_data_t    *ads_data_g;
+extern max_data_t    *max_data_g;
+extern sys_data_t     sys_data_g;
+extern file_counter_t file_counter_g;
 
 /* MUTEX */
 // extern SemaphoreHandle_t xDATAMutex;
@@ -33,4 +34,5 @@ void task_max(void *pvParameters);
 void task_sd(void *pvParameters);
 void task_littlefs(void *pvParameters);
 void task_lora(void *pvParameters);
+void task_nvs(void *pvParameters);
 void task_log(void *pvParameters);

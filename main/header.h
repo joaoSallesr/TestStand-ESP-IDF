@@ -23,6 +23,8 @@
 #include <driver/spi_master.h>
 #include <esp_vfs_fat.h>
 #include <hal/spi_types.h>
+#include <nvs.h>
+#include <nvs_flash.h>
 #include <sdmmc_cmd.h>
 
 #include <freertos/FreeRTOS.h>
@@ -74,8 +76,9 @@
 #define FULL_ACQ  (1 << 2)
 #define PART_ACQ  (1 << 3)
 #define SAVE_DATA (1 << 4)
-#define SEND_DATA (1 << 5)
-#define END_TEST  (1 << 6)
+#define NVS_EDIT  (1 << 5)
+#define SEND_DATA (1 << 6)
+#define END_TEST  (1 << 7)
 
 // SAMPLE STRUCTURES
 typedef struct __attribute__((packed)) {
@@ -91,7 +94,7 @@ typedef struct __attribute__((packed)) {
     int16_t  max3;      // 2 Bytes
 } max_data_t;           // 10 Bytes
 
-// SYSTEM STRUCTURE
+// SYSTEM STRUCTURES
 typedef struct __attribute__((packed)) {
     volatile uint32_t ads_sample; // 4 Bytes
     volatile uint32_t max_sample; // 4 Bytes
@@ -105,11 +108,20 @@ typedef struct __attribute__((packed)) {
     uint32_t timestamp;   // 4 Byte
 } file_header_t;          // 16 bytes
 
+typedef struct __attribute__((packed)) {
+    uint32_t file_numSD;
+    uint32_t file_numLFS;
+    bool     format;
+} file_counter_t;
+
 typedef enum {
     EVT_ARM,       // system armed
     EVT_IGNITION,  // ignition started
     EVT_ADS_DONE,  // task_ads finished full acquisition
     EVT_MAX_DONE,  // task_max finished
-    EVT_SAVE_DONE, // task_sd finished writing
+    EVT_SD_DONE,   // task_sd finished writing
+    EVT_LFS_DONE,  // task_lfs finished writing
+    EVT_SAVE_DONE, // sd and lfs finished writing
     EVT_SEND_DONE, // task_lora finished sending
+    EVT_NVS_DONE,  // task_nvs finished
 } sys_event_t;
