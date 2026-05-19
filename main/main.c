@@ -67,7 +67,7 @@ static void setup_peripherals(void) {
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
 }
 
-void task_state(void *pvParameters) {
+void task_status(void *pvParameters) {
     sys_event_t evt;
     while (true) {
         if (xQueueReceive(xEventQueue, &evt, portMAX_DELAY) != pdTRUE)
@@ -167,7 +167,7 @@ void app_main(void) {
     /* Create Tasks */
     // Verificar parametros de criação das task
     // task log ?
-    xTaskCreatePinnedToCore(task_state, "SYS", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskAds, 1);
     xTaskCreatePinnedToCore(task_max, "MAX", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 1);
