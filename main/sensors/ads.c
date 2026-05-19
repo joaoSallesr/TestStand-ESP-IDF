@@ -1,9 +1,9 @@
 #include "global.h"
 
+static const char *TAG_ADS = "ADS";
+
 #define FULL_ACQ_DURATION_MS 7000
 #define ADS_DRDY_TIMEOUT_MS  10
-
-static const char *TAG_ADS = "ADS";
 
 static void IRAM_ATTR drdy_isr_handler(void *arg) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;

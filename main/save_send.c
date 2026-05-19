@@ -1,5 +1,9 @@
 #include "global.h"
 
+static const char *TAG_SD       = "SD";
+static const char *TAG_LITTLEFS = "LittleFS";
+static const char *TAG_LORA     = "LoRa";
+
 // SD & LITTLEFS CONFIG
 #define SD_MAX_FILES    5
 #define SD_MOUNT        "/sdcard"
@@ -15,10 +19,6 @@
 #define LORA_BANDWIDTH        SX126X_LORA_BW_125_0
 #define LORA_CODING_RATE      SX126X_LORA_CR_4_5
 #define LORA_DIO1_TIMEOUT_MS  1000
-
-static const char *TAG_SD       = "SD";
-static const char *TAG_LITTLEFS = "LittleFS";
-static const char *TAG_LORA     = "LoRa";
 
 static void IRAM_ATTR dio1_isr_handler(void *arg) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
