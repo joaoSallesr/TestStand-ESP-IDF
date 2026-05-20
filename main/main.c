@@ -131,19 +131,11 @@ void task_status(void *pvParameters) {
         xEventGroupSetBits(xSystemEvent, SAVE_DATA);
         break;
 
-    case EVT_SD_DONE:
-        ESP_LOGI(TAG_SYS, "SD DONE");
-        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
-        break;
-
-    case EVT_LFS_DONE:
-        ESP_LOGI(TAG_SYS, "LFS DONE");
-        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
-        break;
-
     case EVT_SAVE_DONE:
         ESP_LOGI(TAG_SYS, "SAVE_DATA -> NVS_EDIT");
         xEventGroupClearBits(xSystemEvent, SAVE_DATA);
+        xEventGroupClearBits(xSystemEvent, SD_DONE);
+        xEventGroupClearBits(xSystemEvent, LFS_DONE);
         xEventGroupSetBits(xSystemEvent, NVS_EDIT);
         break;
 

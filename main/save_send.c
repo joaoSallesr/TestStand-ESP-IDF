@@ -164,8 +164,21 @@ unmount:
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
 
-    sys_event_t evt = EVT_SD_DONE;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    EventBits_t bits = xEventGroupSetBits(xSystemEvent, SD_DONE);
+    if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
+        sys_event_t evt = EVT_SAVE_DONE;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    }
+
+    vTaskDelete(NULL);
+}
+
+void task_lfs(void *pvParameters) {
+    EventBits_t bits = xEventGroupSetBits(xSystemEvent, LFS_DONE);
+    if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
+        sys_event_t evt = EVT_SAVE_DONE;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    }
 
     vTaskDelete(NULL);
 }
