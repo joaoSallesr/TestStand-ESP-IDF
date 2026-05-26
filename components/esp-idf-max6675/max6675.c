@@ -2,13 +2,17 @@
 
 static const char *TAG = "max6675";
 
-#define MAX_SPI_CLK_HZ 4300000
+#define MAX6675_SPI_CLK_HZ 4300000
 
 #define ESP_ARG_CHECK(VAL)                                                                                             \
     do {                                                                                                               \
         if (!(VAL))                                                                                                    \
             return ESP_ERR_INVALID_ARG;                                                                                \
     } while (0)
+
+static inline void cs_low(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, 0); }
+
+static inline void cs_high(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, 1); }
 
 esp_err_t max6675_init(const max6675_config_t *max6675_config, max6675_handle_t *max6675_handle) {
     ESP_ARG_CHECK(max6675_config);
@@ -34,10 +38,10 @@ esp_err_t max6675_init(const max6675_config_t *max6675_config, max6675_handle_t 
 
     /* SPI device configuration */
     const spi_device_interface_config_t max_dev_config = {
-        .mode           = 0,              // CPOL=0 (idle low), CPHA=0 (sample on rising edge)
-        .clock_speed_hz = MAX_SPI_CLK_HZ, // 4.3 MHz
-        .spics_io_num   = -1,             // CS managed manually
-        .queue_size     = 1,              // queue not used
+        .mode           = 0,                  // CPOL=0 (idle low), CPHA=0 (sample on rising edge)
+        .clock_speed_hz = MAX6675_SPI_CLK_HZ, // 4.3 MHz
+        .spics_io_num   = -1,                 // CS managed manually
+        .queue_size     = 1,                  // queue not used
     };
 
     /* add MAX6675 to SPI bus */
@@ -55,11 +59,36 @@ err_handle:
 }
 
 esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
-    // CS HIGH -> measure (wait 220ms)
+    esp_err_t ret = ESP_OK;
+    uint16_t  data;
 
-    // CS LOW -> output result
+    // 16 bits reading
+    spi_transaction_t t = {
+        .length    = 16,
+        .rxlength  = 16,
+        .rx_buffer = &data,
+    };
 
-    // CS HIGH ->loop
+    ESP_RETURN_ON_ERROR(spi_device_acquire_bus(handle->spi_handle, portMAX_DELAY), TAG,
+                        "Failed to acquire bus for read");
+
+    cs_low(handle);
+    ESP_RETURN_ON_ERROR(spi_device_polling_transmit(handle->spi_handle, &data), TAG, "Failed to transmit reading");
+
+done:
+    cs_high(handle);
+    spi_device_release_bus(handle->spi_handle);
+
+    if (ret != ESP_OK)
+        return ret;
+
+    /* get the temperature bits (14:3) from data */
+    uint16_t raw = (data >> 3) & 0x0FFF;
+
+    /* temperature resolution = 0.25 */
+    raw *= 0.25;
+    *out_raw = raw;
+
     return ESP_OK;
 }
 
