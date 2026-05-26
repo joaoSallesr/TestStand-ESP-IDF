@@ -3,6 +3,9 @@
 static const char *TAG_MAIN = "main";
 static const char *TAG_SYS  = "system";
 
+#define FORMAT_MODE      false
+#define EVENT_QUEUE_SIZE 10
+
 static void setup_memory(void) {
     // sdkconfig -> + Support for external, SPI-connected RAM
     ads_data_g = (ads_data_t *)heap_caps_aligned_alloc(4, ADS_SAMPLES * sizeof(ads_data_t), MALLOC_CAP_SPIRAM);
@@ -29,7 +32,7 @@ static void setup_peripherals(void) {
         .sclk_io_num     = CLK,
         .quadwp_io_num   = -1,
         .quadhd_io_num   = -1,
-        .max_transfer_sz = 32 * 1024,
+        .max_transfer_sz = 4096,
     };
 
     // SPI host setup
@@ -93,9 +96,9 @@ static void setup_nvs(bool format_mode) {
 
     nvs_close(nvs_handle);
 
-    file_counter_g.file_numSD  = sd_num;
-    file_counter_g.file_numLFS = lfs_num;
-    file_counter_g.format      = format_mode;
+    file_counter_g.sd_files  = sd_num;
+    file_counter_g.lfs_files = lfs_num;
+    file_counter_g.format    = format_mode;
 }
 
 void task_status(void *pvParameters) {
@@ -158,7 +161,6 @@ void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
 
     // TESTAR
-
     ESP_LOGI(TAG_MAIN,
              "[ BEFORE ] - Free Heap: %u bytes\n"
              "  MALLOC_CAP_8BIT      %7zu bytes\n"
@@ -172,21 +174,24 @@ void app_main(void) {
              heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
              heap_caps_get_free_size(MALLOC_CAP_RETENTION));
-
     // TESTAR
 
     setup_memory();
     setup_peripherals();
+    setup_nvs(FORMAT_MODE);
     vTaskDelay(pdMS_TO_TICKS(150)); // Wait for peripherals to stabilize
 
+    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
+
+    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
+
     /* Create Queue */
-    xEventQueue = xQueueCreate(10, sizeof(sys_event_t));
+    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(sys_event_t));
 
     /* Create Mutexes */
     // xDATAMutex = xSemaphoreCreateMutex();
 
     // TESTAR
-
     ESP_LOGI(TAG_MAIN,
              "[ AFTER ] - Free Heap: %u bytes\n"
              "  MALLOC_CAP_8BIT      %7zu bytes\n"
@@ -200,7 +205,6 @@ void app_main(void) {
              heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
              heap_caps_get_free_size(MALLOC_CAP_RETENTION));
-
     // TESTAR
 
     /* Create Tasks */

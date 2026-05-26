@@ -33,6 +33,6 @@ void task_ads(void *pvParameters);
 void task_max(void *pvParameters);
 void task_sd(void *pvParameters);
 void task_littlefs(void *pvParameters);
-void task_lora(void *pvParameters);
 void task_nvs(void *pvParameters);
+void task_lora(void *pvParameters);
 void task_log(void *pvParameters);

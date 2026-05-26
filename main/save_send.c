@@ -2,6 +2,7 @@
 
 static const char *TAG_SD       = "SD";
 static const char *TAG_LITTLEFS = "LittleFS";
+static const char *TAG_NVS      = "NVS";
 static const char *TAG_LORA     = "LoRa";
 
 // SD & LITTLEFS CONFIG
@@ -88,7 +89,7 @@ void task_sd(void *pvParameters) {
 
     /* Create log file */
     char log_name[FILENAME_LENGTH];
-    snprintf(log_name, FILENAME_LENGTH, "%s/test%d.bin", SD_MOUNT, file_counter_g.file_numSD);
+    snprintf(log_name, FILENAME_LENGTH, "%s/test%d.bin", SD_MOUNT, file_counter_g.sd_files);
     ESP_LOGI(TAG_SD, "Creating file %s", log_name);
 
     FILE *f = fopen(log_name, "wb");
@@ -174,6 +175,16 @@ unmount:
 }
 
 void task_lfs(void *pvParameters) {
+
+    // TODO:
+    // LFS INIT
+
+    /* Wait for SAVE_DATA */
+    xEventGroupWaitBits(xSystemEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+
+    // TODO:
+    // LFS SAVE
+
     EventBits_t bits = xEventGroupSetBits(xSystemEvent, LFS_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         sys_event_t evt = EVT_SAVE_DONE;
@@ -184,9 +195,26 @@ void task_lfs(void *pvParameters) {
 }
 
 void task_nvs(void *pvParameters) {
+    nvs_handle_t nvs_handle;
 
     /* Wait for SAVE_DONE */
     xEventGroupWaitBits(xSystemEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    ESP_LOGI(TAG_NVS, "Starting NVS file counter update");
+    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, nvs_handle));
+
+    /* Increment file counter */
+    file_counter_g.sd_files += 1;
+    file_counter_g.lfs_files += 1;
+
+    /* Update NVS */
+    nvs_set_u32(nvs_handle, "sd_counter", file_counter_g.sd_files);
+    nvs_set_u32(nvs_handle, "lfs_counter", file_counter_g.lfs_files);
+    ESP_ERROR_CHECK(nvs_commit(nvs_handle));
+
+    nvs_close(nvs_handle);
+
+    ESP_LOGI(TAG_NVS, "NVS file counter updated");
+    vTaskDelete(NULL);
 }
 
 static void lora_init(sx126x_handle_t *lora_handle) {
