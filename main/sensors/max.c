@@ -2,7 +2,8 @@
 
 static const char *TAG_MAX = "MAX";
 
-#define PARTIAL_ACQ_DURATION_MS 20000
+#define PARTIAL_ACQ_DURATION_MS    20000
+#define MAX6675_CONVERSION_TIME_MS 250
 
 bool max_check(int64_t max_start) {
     bool buffer_full  = sys_data_g.max_sample >= MAX_SAMPLES;
@@ -68,8 +69,8 @@ void task_max(void *pvParameters) {
         if (max_check(max_start))
             break;
 
-        /* CS HIGH = measure (wait 220ms) -> CS LOW = output */
-        vTaskDelay(pdMS_TO_TICKS(220));
+        /* CS HIGH = measure - conversion time (CT_MS) -> CS LOW = output */
+        vTaskDelay(pdMS_TO_TICKS(MAX6675_CONVERSION_TIME_MS));
     }
 
     ESP_ERROR_CHECK(max6675_delete(max1_handle));
