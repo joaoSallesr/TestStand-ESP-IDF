@@ -25,7 +25,7 @@ static void setup_memory(void) {
 }
 
 static void setup_peripherals(void) {
-    // SPI bus configuration
+    /* SPI bus configuration */
     spi_bus_config_t spi_bus_cfg = {
         .mosi_io_num     = MOSI,
         .miso_io_num     = MISO,
@@ -35,16 +35,12 @@ static void setup_peripherals(void) {
         .max_transfer_sz = 4096,
     };
 
-    // SPI host setup
-    spi_host_device_t host = SPI_HOST;
-
-    // SPI dma setup
-    spi_dma_chan_t dma_chan = DMA_CHAN;
-
-    // SPI bus initialization (2 ADS1256, 1 MAX31865 and 2 MAX6675)
+    /* SPI bus intialization */
+    spi_host_device_t host     = SPI_HOST;
+    spi_dma_chan_t    dma_chan = DMA_CHAN;
     ESP_ERROR_CHECK(spi_bus_initialize(host, &spi_bus_cfg, dma_chan));
 
-    // DRDY config with ISR
+    /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
         .pin_bit_mask = (1ULL << LOADCELL_DRDY),
         .mode         = GPIO_MODE_INPUT,
@@ -53,7 +49,7 @@ static void setup_peripherals(void) {
         .intr_type    = GPIO_INTR_NEGEDGE // Trigger when DRDY goes LOW
     };
 
-    // DIO1 config with ISR
+    /* DIO1 config with ISR */
     gpio_config_t dio1_conf = {
         .pin_bit_mask = (1ULL << LORA_DIO1),
         .mode         = GPIO_MODE_INPUT,
@@ -62,11 +58,9 @@ static void setup_peripherals(void) {
         .intr_type    = GPIO_INTR_POSEDGE // Trigger when DIO1 goes HIGH
     };
 
-    // Apply config
+    /* Apply ISR */
     ESP_ERROR_CHECK(gpio_config(&drdy_conf));
     ESP_ERROR_CHECK(gpio_config(&dio1_conf));
-
-    // Start ISR
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
 }
 
