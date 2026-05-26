@@ -12,9 +12,9 @@ static void IRAM_ATTR drdy_isr_handler(void *arg) {
         portYIELD_FROM_ISR();
 }
 
-static bool status_check(int64_t acq_start) {
+bool ads_check(int64_t ads_start) {
     bool buffer_full  = sys_data_g.ads_sample >= ADS_SAMPLES;
-    bool time_elapsed = (esp_timer_get_time() - acq_start) >= (FULL_ACQ_DURATION_MS * 1000);
+    bool time_elapsed = (esp_timer_get_time() - ads_start) >= (FULL_ACQ_DURATION_MS * 1000);
 
     if ((xEventGroupGetBits(xSystemEvent) & FULL_ACQ)) {
         if (buffer_full || time_elapsed) {
@@ -85,7 +85,7 @@ void task_ads(void *pvParameters) {
     /* Wait for acquisition to start */
     xEventGroupWaitBits(xSystemEvent, FULL_ACQ, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    int64_t acq_start = esp_timer_get_time();
+    int64_t ads_start = esp_timer_get_time();
 
     while (true) {
         ads1256_start_conversion(loadcell_handle);
@@ -109,7 +109,7 @@ void task_ads(void *pvParameters) {
         memcpy(&ads_data_g[sys_data_g.ads_sample], &sample, sizeof(ads_data_t));
         sys_data_g.ads_sample++;
 
-        if (status_check(acq_start))
+        if (ads_check(ads_start))
             break;
     }
 

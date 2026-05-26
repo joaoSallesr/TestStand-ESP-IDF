@@ -89,7 +89,7 @@ void task_sd(void *pvParameters) {
 
     /* Create log file */
     char log_name[FILENAME_LENGTH];
-    snprintf(log_name, FILENAME_LENGTH, "%s/test%d.bin", SD_MOUNT, file_counter_g.sd_files);
+    snprintf(log_name, FILENAME_LENGTH, "%s/test%lu.bin", SD_MOUNT, file_counter_g.sd_files);
     ESP_LOGI(TAG_SD, "Creating file %s", log_name);
 
     FILE *f = fopen(log_name, "wb");
@@ -200,7 +200,7 @@ void task_nvs(void *pvParameters) {
     /* Wait for SAVE_DONE */
     xEventGroupWaitBits(xSystemEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(TAG_NVS, "Starting NVS file counter update");
-    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, nvs_handle));
+    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
 
     /* Increment file counter */
     file_counter_g.sd_files += 1;
