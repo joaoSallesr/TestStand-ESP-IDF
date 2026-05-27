@@ -2,8 +2,7 @@
 
 static const char *TAG_ADS = "ADS";
 
-#define FULL_ACQ_DURATION_MS 7000
-#define ADS_DRDY_TIMEOUT_MS  10
+#define ADS_DRDY_TIMEOUT_MS 1
 
 static void IRAM_ATTR drdy_isr_handler(void *arg) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -73,8 +72,8 @@ void task_ads(void *pvParameters) {
     ads1256_handle_t loadcell_handle;
     ads1256_handle_t transducer_handle;
 
-    int32_t current_loadcell;
-    int32_t current_transducer;
+    int32_t current_thrust;
+    int32_t current_pressure;
 
     loadcell_init(&loadcell_handle);
     transducer_init(&transducer_handle);
@@ -95,14 +94,14 @@ void task_ads(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
         /* Load Cell + Pressure Transducer reading */
-        ads1256_read_result(loadcell_handle, &current_loadcell);
-        ads1256_read_result(transducer_handle, &current_transducer);
+        ads1256_read_result(loadcell_handle, &current_thrust);
+        ads1256_read_result(transducer_handle, &current_pressure);
 
         /* Create ads sample */
         ads_data_t sample = {
             .timestamp = (uint32_t)esp_timer_get_time(),
-            .loadcell  = current_loadcell,
-            .trans     = current_transducer,
+            .thrust    = current_thrust,
+            .pressure  = current_pressure,
         };
 
         /* Copy sample to PSRAM */

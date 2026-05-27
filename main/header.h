@@ -1,6 +1,5 @@
 #pragma once
 
-// INCLUDES
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -35,7 +34,7 @@
 #include "max6675.h"
 #include "ra01s.h"
 
-// GPIO
+/* GPIO */
 #define BUZZER_GPIO   GPIO_NUM_4
 #define IGNITOR_GPIO  GPIO_NUM_5
 #define SQUIB_GPIO    GPIO_NUM_7
@@ -63,15 +62,18 @@
 #define LORA_BUSY     GPIO_NUM_41
 #define LORA_RESET    GPIO_NUM_40
 
-// SPI CONFIG
+/* SPI CONFIG */
 #define SPI_HOST SPI2_HOST
 #define DMA_CHAN SPI_DMA_CH_AUTO
 
-// MEMORY CONFIG
-#define MAX_SAMPLES 700
-#define ADS_SAMPLES 7000
+/* MEMORY CONFIG */
+#define ADS_SAMPLES          7000
+#define FULL_ACQ_DURATION_MS 7000
 
-// STATUS FLAGS
+#define MAX_SAMPLES             700
+#define PARTIAL_ACQ_DURATION_MS 20000
+
+/* STATUS FLAGS */
 #define IDLE      BIT(0)
 #define ARMED     BIT(1)
 #define FULL_ACQ  BIT(2)
@@ -83,25 +85,24 @@
 #define SEND_DATA BIT(8)
 #define END_TEST  BIT(9)
 
-// SAMPLE STRUCTURES
+/* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
     uint32_t timestamp; // 4 Bytes
-    int32_t  loadcell;  // 4 Bytes
-    int32_t  trans;     // 4 Bytes
+    int32_t  thrust;    // 4 Bytes
+    int32_t  pressure;  // 4 Bytes
 } ads_data_t;           // 12 Bytes/sample -> 12 * ADS_SAMPLES
 
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp; // 4 Bytes
-    int16_t  max1;      // 2 Bytes
-    int16_t  max2;      // 2 Bytes
-    int16_t  max3;      // 2 Bytes
-} max_data_t;           // 10 Bytes
+    uint32_t timestamp;    // 4 Bytes
+    int16_t  temperature1; // 2 Bytes
+    int16_t  temperature2; // 2 Bytes
+} max_data_t;              // 8 Bytes
 
-// SYSTEM STRUCTURES
-typedef struct __attribute__((packed)) {
-    volatile uint32_t ads_sample; // 4 Bytes
-    volatile uint32_t max_sample; // 4 Bytes
-} sys_data_t;                     // 8 Bytes
+/* SYSTEM STRUCTURES */
+typedef struct {
+    uint32_t ads_sample; // 4 Bytes
+    uint32_t max_sample; // 4 Bytes
+} sys_data_t;            // 8 Bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t name_check;  // 4 Bytes

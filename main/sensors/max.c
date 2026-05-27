@@ -2,7 +2,6 @@
 
 static const char *TAG_MAX = "MAX";
 
-#define PARTIAL_ACQ_DURATION_MS    20000
 #define MAX6675_CONVERSION_TIME_MS 250
 
 bool max_check(int64_t max_start) {
@@ -38,8 +37,8 @@ void task_max(void *pvParameters) {
     max6675_handle_t max1_handle;
     max6675_handle_t max2_handle;
 
-    uint16_t current_max1;
-    uint16_t current_max2;
+    uint16_t current_temperature1;
+    uint16_t current_temperature2;
 
     max_init(&max1_handle, MAX1_CS);
     max_init(&max2_handle, MAX2_CS);
@@ -52,14 +51,14 @@ void task_max(void *pvParameters) {
     while (true) {
 
         /* MAX readings */
-        max6675_read(max1_handle, &current_max1);
-        max6675_read(max2_handle, &current_max2);
+        max6675_read(max1_handle, &current_temperature1);
+        max6675_read(max2_handle, &current_temperature2);
 
         /* Create MAX sample */
         max_data_t sample = {
-            .timestamp = (uint32_t)esp_timer_get_time(),
-            .max1      = current_max1,
-            .max2      = current_max2,
+            .timestamp    = (uint32_t)esp_timer_get_time(),
+            .temperature1 = current_temperature1,
+            .temperature2 = current_temperature2,
         };
 
         /* Copy sample to PSRAM */

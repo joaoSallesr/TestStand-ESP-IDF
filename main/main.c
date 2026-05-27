@@ -97,57 +97,58 @@ static void setup_nvs(bool format_mode) {
 
 void task_status(void *pvParameters) {
     sys_event_t evt;
+
     while (true) {
         if (xQueueReceive(xEventQueue, &evt, portMAX_DELAY) != pdTRUE)
             continue;
-    }
 
-    switch (evt) {
+        switch (evt) {
 
-    case EVT_ARM:
-        ESP_LOGI(TAG_SYS, "IDLE -> ARMED");
-        xEventGroupClearBits(xSystemEvent, IDLE);
-        xEventGroupSetBits(xSystemEvent, ARMED);
-        break;
+        case EVT_ARM:
+            ESP_LOGI(TAG_SYS, "IDLE -> ARMED");
+            xEventGroupClearBits(xSystemEvent, IDLE);
+            xEventGroupSetBits(xSystemEvent, ARMED);
+            break;
 
-    case EVT_IGNITION:
-        ESP_LOGI(TAG_SYS, "ARMED -> FULL_ACQ");
-        xEventGroupClearBits(xSystemEvent, ARMED);
-        xEventGroupSetBits(xSystemEvent, FULL_ACQ);
-        break;
+        case EVT_IGNITION:
+            ESP_LOGI(TAG_SYS, "ARMED -> FULL_ACQ");
+            xEventGroupClearBits(xSystemEvent, ARMED);
+            xEventGroupSetBits(xSystemEvent, FULL_ACQ);
+            break;
 
-    case EVT_ADS_DONE:
-        ESP_LOGI(TAG_SYS, "FULL_ACQ -> PART_ACQ");
-        xEventGroupClearBits(xSystemEvent, FULL_ACQ);
-        xEventGroupSetBits(xSystemEvent, PART_ACQ);
-        break;
+        case EVT_ADS_DONE:
+            ESP_LOGI(TAG_SYS, "FULL_ACQ -> PART_ACQ");
+            xEventGroupClearBits(xSystemEvent, FULL_ACQ);
+            xEventGroupSetBits(xSystemEvent, PART_ACQ);
+            break;
 
-    case EVT_MAX_DONE:
-        ESP_LOGI(TAG_SYS, "PART_ACQ -> SAVE_DATA");
-        xEventGroupClearBits(xSystemEvent, PART_ACQ);
-        xEventGroupSetBits(xSystemEvent, SAVE_DATA);
-        break;
+        case EVT_MAX_DONE:
+            ESP_LOGI(TAG_SYS, "PART_ACQ -> SAVE_DATA");
+            xEventGroupClearBits(xSystemEvent, PART_ACQ);
+            xEventGroupSetBits(xSystemEvent, SAVE_DATA);
+            break;
 
-    case EVT_SAVE_DONE:
-        ESP_LOGI(TAG_SYS, "SAVE_DATA -> NVS_EDIT");
-        xEventGroupClearBits(xSystemEvent, SAVE_DATA);
-        xEventGroupClearBits(xSystemEvent, SD_DONE);
-        xEventGroupClearBits(xSystemEvent, LFS_DONE);
-        xEventGroupSetBits(xSystemEvent, NVS_EDIT);
-        break;
+        case EVT_SAVE_DONE:
+            ESP_LOGI(TAG_SYS, "SAVE_DATA -> NVS_EDIT");
+            xEventGroupClearBits(xSystemEvent, SAVE_DATA);
+            xEventGroupClearBits(xSystemEvent, SD_DONE);
+            xEventGroupClearBits(xSystemEvent, LFS_DONE);
+            xEventGroupSetBits(xSystemEvent, NVS_EDIT);
+            break;
 
-    case EVT_NVS_DONE:
-        ESP_LOGI(TAG_SYS, "NVS_EDIT -> SEND_DATA");
-        xEventGroupClearBits(xSystemEvent, NVS_EDIT);
-        xEventGroupSetBits(xSystemEvent, SEND_DATA);
-        break;
+        case EVT_NVS_DONE:
+            ESP_LOGI(TAG_SYS, "NVS_EDIT -> SEND_DATA");
+            xEventGroupClearBits(xSystemEvent, NVS_EDIT);
+            xEventGroupSetBits(xSystemEvent, SEND_DATA);
+            break;
 
-    case EVT_SEND_DONE:
-        ESP_LOGI(TAG_SYS, "SEND_DATA -> END_TEST");
-        xEventGroupClearBits(xSystemEvent, SEND_DATA);
-        xEventGroupSetBits(xSystemEvent, END_TEST);
-        ESP_LOGI(TAG_SYS, "Test complete.");
-        break;
+        case EVT_SEND_DONE:
+            ESP_LOGI(TAG_SYS, "SEND_DATA -> END_TEST");
+            xEventGroupClearBits(xSystemEvent, SEND_DATA);
+            xEventGroupSetBits(xSystemEvent, END_TEST);
+            ESP_LOGI(TAG_SYS, "Test complete.");
+            break;
+        }
     }
 }
 
@@ -182,8 +183,8 @@ void app_main(void) {
     /* Create Queue */
     xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(sys_event_t));
 
-    /* Create Mutexes */
-    // xDATAMutex = xSemaphoreCreateMutex();
+    /* Create Event Group */
+    xSystemEvent = xEventGroupCreate();
 
     // TESTAR
     ESP_LOGI(TAG_MAIN,

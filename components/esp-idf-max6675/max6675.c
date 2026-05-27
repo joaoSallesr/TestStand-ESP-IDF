@@ -73,7 +73,7 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
                         "Failed to acquire bus for read");
 
     cs_low(handle);
-    ESP_RETURN_ON_ERROR(spi_device_polling_transmit(handle->spi_handle, &data), TAG, "Failed to transmit reading");
+    ESP_GOTO_ON_ERROR(spi_device_polling_transmit(handle->spi_handle, &t), done, TAG, "Failed to transmit reading");
 
 done:
     cs_high(handle);

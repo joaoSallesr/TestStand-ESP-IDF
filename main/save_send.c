@@ -214,6 +214,9 @@ void task_nvs(void *pvParameters) {
     nvs_close(nvs_handle);
 
     ESP_LOGI(TAG_NVS, "NVS file counter updated");
+
+    sys_event_t evt = EVT_NVS_DONE;
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     vTaskDelete(NULL);
 }
 
