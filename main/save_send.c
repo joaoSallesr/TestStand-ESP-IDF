@@ -82,7 +82,7 @@ void task_sd(void *pvParameters) {
     }
 
     /* Wait for SAVE_DATA */
-    xEventGroupWaitBits(xSystemEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
@@ -167,9 +167,9 @@ unmount:
     ESP_LOGI(TAG_SD, "Card unmounted");
 
 done:
-    EventBits_t bits = xEventGroupSetBits(xSystemEvent, SD_DONE);
+    EventBits_t bits = xEventGroupSetBits(xStatusEvent, SD_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
-        sys_event_t evt = EVT_SAVE_DONE;
+        status_event_t evt = EVT_SAVE_DONE;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
@@ -182,14 +182,14 @@ void task_lfs(void *pvParameters) {
     // LFS INIT
 
     /* Wait for SAVE_DATA */
-    xEventGroupWaitBits(xSystemEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     // TODO:
     // LFS SAVE
 
-    EventBits_t bits = xEventGroupSetBits(xSystemEvent, LFS_DONE);
+    EventBits_t bits = xEventGroupSetBits(xStatusEvent, LFS_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
-        sys_event_t evt = EVT_SAVE_DONE;
+        status_event_t evt = EVT_SAVE_DONE;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
@@ -200,7 +200,7 @@ void task_nvs(void *pvParameters) {
     nvs_handle_t nvs_handle;
 
     /* Wait for SAVE_DONE */
-    xEventGroupWaitBits(xSystemEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(TAG_NVS, "Starting NVS file counter update");
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
 
@@ -217,7 +217,7 @@ void task_nvs(void *pvParameters) {
 
     ESP_LOGI(TAG_NVS, "NVS file counter updated");
 
-    sys_event_t evt = EVT_NVS_DONE;
+    status_event_t evt = EVT_NVS_DONE;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     vTaskDelete(NULL);
 }
@@ -269,8 +269,8 @@ void task_lora(void *pvParameters) {
     /* SX1262 DIO1 ISR initialization */
     ESP_ERROR_CHECK(gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL));
 
-    xEventGroupSetBits(xSystemEvent, LORA_INIT);
-    xEventGroupWaitBits(xSystemEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    // xEventGroupSetBits(xStatusEvent, LORA_INIT);
+    xEventGroupWaitBits(xStatusEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Send ADS samples */
     for (uint32_t i = 0; i < sys_data_g.ads_sample; i++) {
@@ -317,7 +317,7 @@ void task_lora(void *pvParameters) {
 
     ESP_LOGI(TAG_LORA, "SEND_DATA complete");
 
-    sys_event_t evt = EVT_SEND_DONE;
+    status_event_t evt = EVT_SEND_DONE;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
     gpio_intr_disable(LORA_DIO1);

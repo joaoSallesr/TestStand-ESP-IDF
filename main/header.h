@@ -77,8 +77,8 @@
 #define PARTIAL_ACQ_DURATION_MS 20000
 
 /* STATUS FLAGS */
-#define IDLE      BIT(0)
-#define LORA_INIT BIT(1)
+#define SETUP     BIT(0)
+#define IDLE      BIT(1)
 #define ARMED     BIT(2)
 #define FULL_ACQ  BIT(3)
 #define PART_ACQ  BIT(4)
@@ -122,12 +122,16 @@ typedef struct __attribute__((packed)) {
 } file_counter_t;
 
 typedef enum {
-    EVT_ARM,         // system armed
-    EVT_IGNITION,    // ignition started
-    EVT_ADS_DONE,    // task_ads finished full acquisition
-    EVT_MAX_DONE,    // task_max finished
-    EVT_SAVE_DONE,   // sd and lfs finished writing
-    EVT_SEND_DONE,   // task_lora finished sending
-    EVT_NVS_DONE,    // task_nvs finished
+    EVT_SETUP,     // setup finished
+    EVT_ARM,       // system armed
+    EVT_IGNITION,  // ignition started
+    EVT_ADS_DONE,  // task_ads finished full acquisition
+    EVT_MAX_DONE,  // task_max finished
+    EVT_SAVE_DONE, // sd and lfs finished writing
+    EVT_SEND_DONE, // task_lora finished sending
+    EVT_NVS_DONE,  // task_nvs finished
+} status_event_t;
+
+typedef enum {
     EVT_FATAL_ERROR, // fatal error detected -> stop ignition
-} sys_event_t;
+} system_event_t;

@@ -10,6 +10,7 @@ file_counter_t file_counter_g = {0};
 QueueHandle_t xEventQueue = NULL;
 
 /* EVENT HANDLE*/
+EventGroupHandle_t xStatusEvent = NULL;
 EventGroupHandle_t xSystemEvent = NULL;
 
 /* TASK HANDLE */

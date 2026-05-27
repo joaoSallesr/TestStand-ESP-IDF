@@ -15,9 +15,9 @@ bool ads_check(int64_t ads_start) {
     bool buffer_full  = sys_data_g.ads_sample >= ADS_SAMPLES;
     bool time_elapsed = (esp_timer_get_time() - ads_start) >= (FULL_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xSystemEvent) & FULL_ACQ)) {
+    if ((xEventGroupGetBits(xStatusEvent) & FULL_ACQ)) {
         if (buffer_full || time_elapsed) {
-            sys_event_t evt = EVT_ADS_DONE;
+            status_event_t evt = EVT_ADS_DONE;
             xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_ADS, "Full acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
@@ -82,7 +82,7 @@ void task_ads(void *pvParameters) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(LOADCELL_DRDY, drdy_isr_handler, NULL));
 
     /* Wait for acquisition to start */
-    xEventGroupWaitBits(xSystemEvent, FULL_ACQ, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, FULL_ACQ, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t ads_start = esp_timer_get_time();
 

@@ -3,33 +3,10 @@
 static const char *TAG_ARM = "ARM";
 static const char *TAG_IGN = "ignition";
 
-void task_arm(void *pvParameters) {
-
-    /* Wait for lora_init */
-    xEventGroupWaitBits(xSystemEvent, LORA_INIT, pdFALSE, pdTRUE, portMAX_DELAY);
-
-    // TODO:
-    // Armar sistema ao receber sinal ARMED da base
-
-    while (true) {
-
-        // true -> receber sinal ARMED
-        if (true) {
-            ESP_LOGW(TAG_ARM, "SYSTEM ARMED");
-            break;
-        }
-    }
-
-    sys_event_t evt = EVT_ARM;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-
-    vTaskDelete(NULL);
-}
-
 void task_ignition(void *pvParameters) {
 
     /* Wait for armed */
-    xEventGroupWaitBits(xSystemEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
     // TODO:
     // Estourar o Squib ao receber sinal IGNITION da base
@@ -46,7 +23,7 @@ void task_ignition(void *pvParameters) {
         }
     }
 
-    sys_event_t evt = EVT_IGNITION;
+    status_event_t evt = EVT_IGNITION;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);

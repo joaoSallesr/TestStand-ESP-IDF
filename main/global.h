@@ -12,6 +12,7 @@ extern file_counter_t file_counter_g;
 extern QueueHandle_t xEventQueue;
 
 /* EVENT HANDLE*/
+extern EventGroupHandle_t xStatusEvent;
 extern EventGroupHandle_t xSystemEvent;
 
 /* TASK HANDLE */
@@ -19,6 +20,7 @@ extern TaskHandle_t xTaskAds;
 extern TaskHandle_t xTaskLora;
 
 /* TASKS */
+void task_setup(void *pvParameters);
 void task_status(void *pvParameters);
 void task_arm(void *pvParameters);
 void task_ignition(void *pvParameters);
