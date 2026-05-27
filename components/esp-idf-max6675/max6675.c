@@ -10,9 +10,9 @@ static const char *TAG = "max6675";
             return ESP_ERR_INVALID_ARG;                                                                                \
     } while (0)
 
-static inline void cs_low(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, 0); }
+static inline void cs_low(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, LOW); }
 
-static inline void cs_high(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, 1); }
+static inline void cs_high(max6675_handle_t handle) { gpio_set_level(handle->dev_config.cs, HIGH); }
 
 esp_err_t max6675_init(const max6675_config_t *max6675_config, max6675_handle_t *max6675_handle) {
     ESP_ARG_CHECK(max6675_config);

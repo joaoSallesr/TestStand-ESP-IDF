@@ -14,8 +14,10 @@ void task_arm(void *pvParameters) {
     while (true) {
 
         // true -> receber sinal ARMED
-        if (true)
+        if (true) {
+            ESP_LOGW(TAG_ARM, "SYSTEM ARMED");
             break;
+        }
     }
 
     sys_event_t evt = EVT_ARM;

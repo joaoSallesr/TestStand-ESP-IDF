@@ -19,7 +19,8 @@
 #include <freertos/task.h>
 #include <freertos/timers.h>
 
-/* MAX6675 structures */
+#define LOW  0
+#define HIGH 1
 
 /**
  * @brief MAX6675 configuration structure.

@@ -34,6 +34,9 @@
 #include "max6675.h"
 #include "ra01s.h"
 
+#define LOW  0
+#define HIGH 1
+
 /* GPIO */
 #define BUZZER_GPIO   GPIO_NUM_4
 #define IGNITOR_GPIO  GPIO_NUM_5

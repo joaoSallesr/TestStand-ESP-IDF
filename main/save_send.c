@@ -269,7 +269,7 @@ void task_lora(void *pvParameters) {
     /* SX1262 DIO1 ISR initialization */
     ESP_ERROR_CHECK(gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL));
 
-    EventBits_t bits = xEventGroupSetBits(xSystemEvent, LORA_INIT);
+    xEventGroupSetBits(xSystemEvent, LORA_INIT);
     xEventGroupWaitBits(xSystemEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Send ADS samples */

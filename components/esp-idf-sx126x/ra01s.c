@@ -31,7 +31,7 @@ esp_err_t LoRaInit(sx126x_config_t *sx126x_config, sx126x_handle_t *sx126x_handl
     /* GPIO config */
     gpio_reset_pin(sx126x_config->ss);
     gpio_set_direction(sx126x_config->ss, GPIO_MODE_OUTPUT);
-    gpio_set_level(sx126x_config->ss, 1);
+    gpio_set_level(sx126x_config->ss, HIGH);
 
     gpio_reset_pin(sx126x_config->reset);
     gpio_set_direction(sx126x_config->reset, GPIO_MODE_OUTPUT);
@@ -351,9 +351,9 @@ void SetTxPower(sx126x_handle_t handle, int8_t txPowerInDbm) {
 
 void Reset(sx126x_handle_t handle) {
     delay(10);
-    gpio_set_level(handle->dev_config.reset, 0);
+    gpio_set_level(handle->dev_config.reset, LOW);
     delay(20);
-    gpio_set_level(handle->dev_config.reset, 1);
+    gpio_set_level(handle->dev_config.reset, HIGH);
     delay(10);
     // ensure BUSY is low (state meachine ready)
     WaitForIdle(handle, BUSY_WAIT, "Reset", true);
