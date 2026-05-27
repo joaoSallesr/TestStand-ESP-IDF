@@ -50,6 +50,9 @@ void task_max(void *pvParameters) {
 
     while (true) {
 
+        if (max_check(max_start))
+            break;
+
         /* MAX readings */
         max6675_read(max1_handle, &current_temperature1_raw);
         max6675_read(max2_handle, &current_temperature2_raw);
@@ -64,9 +67,6 @@ void task_max(void *pvParameters) {
         /* Copy sample to PSRAM */
         memcpy(&max_data_g[sys_data_g.max_sample], &sample, sizeof(max_data_t));
         sys_data_g.max_sample++;
-
-        if (max_check(max_start))
-            break;
 
         /* CS HIGH = measure - conversion time (CT_MS) -> CS LOW = output */
         vTaskDelay(pdMS_TO_TICKS(MAX6675_CONVERSION_TIME_MS));

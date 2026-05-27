@@ -83,8 +83,8 @@ static void setup_nvs(bool format_mode) {
     ESP_LOGI("NVS", "Opening Non-Volatile Storage (NVS) handle... ");
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
 
-    int32_t sd_num  = 0;
-    int32_t lfs_num = 0;
+    uint32_t sd_num  = 0;
+    uint32_t lfs_num = 0;
 
     nvs_get_u32(nvs_handle, "sd_counter", &sd_num);
     nvs_get_u32(nvs_handle, "lfs_counter", &lfs_num);
@@ -154,12 +154,21 @@ void task_status(void *pvParameters) {
             xEventGroupSetBits(xSystemEvent, END_TEST);
             ESP_LOGI(TAG_SYS, "Test complete.");
             break;
+
+        case EVT_FATAL_ERROR:
+            break;
         }
     }
 }
 
 void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
+
+    /* Create Queue */
+    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(sys_event_t));
+
+    /* Create Event Group */
+    xSystemEvent = xEventGroupCreate();
 
     // TESTAR
     ESP_LOGI(TAG_MAIN,
@@ -185,12 +194,6 @@ void app_main(void) {
     // FORMAT MODE (NVS, SD, LFS) =====================================================================================
 
     // FORMAT MODE (NVS, SD, LFS) =====================================================================================
-
-    /* Create Queue */
-    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(sys_event_t));
-
-    /* Create Event Group */
-    xSystemEvent = xEventGroupCreate();
 
     // TESTAR
     ESP_LOGI(TAG_MAIN,

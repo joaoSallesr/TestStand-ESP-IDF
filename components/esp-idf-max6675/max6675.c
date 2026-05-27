@@ -84,7 +84,8 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
     }
 
     /* get the temperature bits (14:3) from data */
-    uint16_t raw = (data) & 0x0FFF;
+    uint16_t raw = (data >> 3) & 0x0FFF;
+    *out_raw     = raw;
 
 done:
     cs_high(handle);
@@ -92,8 +93,6 @@ done:
 
     if (ret != ESP_OK)
         return ret;
-
-    *out_raw = raw;
 
     return ESP_OK;
 }

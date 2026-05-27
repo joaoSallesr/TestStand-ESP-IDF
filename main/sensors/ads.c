@@ -87,6 +87,10 @@ void task_ads(void *pvParameters) {
     int64_t ads_start = esp_timer_get_time();
 
     while (true) {
+
+        if (ads_check(ads_start))
+            break;
+
         ads1256_start_conversion(loadcell_handle);
         ads1256_start_conversion(transducer_handle);
 
@@ -107,9 +111,6 @@ void task_ads(void *pvParameters) {
         /* Copy sample to PSRAM */
         memcpy(&ads_data_g[sys_data_g.ads_sample], &sample, sizeof(ads_data_t));
         sys_data_g.ads_sample++;
-
-        if (ads_check(ads_start))
-            break;
     }
 
     ESP_ERROR_CHECK(ads1256_delete(loadcell_handle));
