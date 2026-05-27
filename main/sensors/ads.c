@@ -72,8 +72,8 @@ void task_ads(void *pvParameters) {
     ads1256_handle_t loadcell_handle;
     ads1256_handle_t transducer_handle;
 
-    int32_t current_thrust;
-    int32_t current_pressure;
+    int32_t current_thrust_raw;
+    int32_t current_pressure_raw;
 
     loadcell_init(&loadcell_handle);
     transducer_init(&transducer_handle);
@@ -94,14 +94,14 @@ void task_ads(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
         /* Load Cell + Pressure Transducer reading */
-        ads1256_read_result(loadcell_handle, &current_thrust);
-        ads1256_read_result(transducer_handle, &current_pressure);
+        ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        ads1256_read_result(transducer_handle, &current_pressure_raw);
 
         /* Create ads sample */
         ads_data_t sample = {
-            .timestamp = (uint32_t)esp_timer_get_time(),
-            .thrust    = current_thrust,
-            .pressure  = current_pressure,
+            .timestamp    = (uint32_t)esp_timer_get_time(),
+            .thrust_raw   = current_thrust_raw,
+            .pressure_raw = current_pressure_raw,
         };
 
         /* Copy sample to PSRAM */

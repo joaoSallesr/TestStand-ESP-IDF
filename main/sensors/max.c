@@ -37,8 +37,8 @@ void task_max(void *pvParameters) {
     max6675_handle_t max1_handle;
     max6675_handle_t max2_handle;
 
-    uint16_t current_temperature1;
-    uint16_t current_temperature2;
+    uint16_t current_temperature1_raw;
+    uint16_t current_temperature2_raw;
 
     max_init(&max1_handle, MAX1_CS);
     max_init(&max2_handle, MAX2_CS);
@@ -51,14 +51,14 @@ void task_max(void *pvParameters) {
     while (true) {
 
         /* MAX readings */
-        max6675_read(max1_handle, &current_temperature1);
-        max6675_read(max2_handle, &current_temperature2);
+        max6675_read(max1_handle, &current_temperature1_raw);
+        max6675_read(max2_handle, &current_temperature2_raw);
 
         /* Create MAX sample */
         max_data_t sample = {
-            .timestamp    = (uint32_t)esp_timer_get_time(),
-            .temperature1 = current_temperature1,
-            .temperature2 = current_temperature2,
+            .timestamp        = (uint32_t)esp_timer_get_time(),
+            .temperature1_raw = current_temperature1_raw,
+            .temperature2_raw = current_temperature2_raw,
         };
 
         /* Copy sample to PSRAM */

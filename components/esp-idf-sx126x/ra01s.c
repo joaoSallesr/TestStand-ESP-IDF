@@ -207,7 +207,7 @@ void LoRaConfig(sx126x_handle_t handle) {
     uint8_t  bandwidth       = handle->dev_config.bandwidth;
     uint8_t  codingRate      = handle->dev_config.coding_rate;
     uint16_t preambleLength  = handle->dev_config.preamble_length;
-    uint8_t  payloadLen      = handle->dev_config.preamble_length;
+    uint8_t  payloadLen      = handle->dev_config.payload_len;
     bool     crcOn           = handle->dev_config.crc_on;
     bool     invertIrq       = handle->dev_config.invert_iq;
 

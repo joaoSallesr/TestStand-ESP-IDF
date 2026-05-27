@@ -87,16 +87,16 @@
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp; // 4 Bytes
-    int32_t  thrust;    // 4 Bytes
-    int32_t  pressure;  // 4 Bytes
-} ads_data_t;           // 12 Bytes/sample -> 12 * ADS_SAMPLES
+    uint32_t timestamp;    // 4 Bytes
+    int32_t  thrust_raw;   // 4 Bytes
+    int32_t  pressure_raw; // 4 Bytes
+} ads_data_t;              // 12 Bytes/sample -> 12 * ADS_SAMPLES
 
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp;    // 4 Bytes
-    int16_t  temperature1; // 2 Bytes
-    int16_t  temperature2; // 2 Bytes
-} max_data_t;              // 8 Bytes
+    uint32_t timestamp;        // 4 Bytes
+    int16_t  temperature1_raw; // 2 Bytes
+    int16_t  temperature2_raw; // 2 Bytes
+} max_data_t;                  // 8 Bytes
 
 /* SYSTEM STRUCTURES */
 typedef struct {
@@ -118,11 +118,12 @@ typedef struct __attribute__((packed)) {
 } file_counter_t;
 
 typedef enum {
-    EVT_ARM,       // system armed
-    EVT_IGNITION,  // ignition started
-    EVT_ADS_DONE,  // task_ads finished full acquisition
-    EVT_MAX_DONE,  // task_max finished
-    EVT_SAVE_DONE, // sd and lfs finished writing
-    EVT_SEND_DONE, // task_lora finished sending
-    EVT_NVS_DONE,  // task_nvs finished
+    EVT_ARM,         // system armed
+    EVT_IGNITION,    // ignition started
+    EVT_ADS_DONE,    // task_ads finished full acquisition
+    EVT_MAX_DONE,    // task_max finished
+    EVT_SAVE_DONE,   // sd and lfs finished writing
+    EVT_SEND_DONE,   // task_lora finished sending
+    EVT_NVS_DONE,    // task_nvs finished
+    EVT_FATAL_ERROR, // fatal error detected -> stop ignition
 } sys_event_t;

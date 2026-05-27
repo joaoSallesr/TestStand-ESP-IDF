@@ -68,7 +68,8 @@ void task_sd(void *pvParameters) {
         } else {
             ESP_LOGE(TAG_SD, "Failed to initialize the card (%s).", esp_err_to_name(ret));
         }
-        return;
+
+        goto done;
     }
     ESP_LOGI(TAG_SD, "Filesystem mounted");
     sdmmc_card_print_info(stdout, card);
@@ -165,6 +166,7 @@ unmount:
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
 
+done:
     EventBits_t bits = xEventGroupSetBits(xSystemEvent, SD_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         sys_event_t evt = EVT_SAVE_DONE;

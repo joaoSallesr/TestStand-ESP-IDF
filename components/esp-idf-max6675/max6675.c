@@ -59,14 +59,14 @@ err_handle:
 }
 
 esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
-    esp_err_t ret = ESP_OK;
-    uint16_t  data;
+    esp_err_t ret   = ESP_OK;
+    uint8_t   rx[2] = {0};
 
     // 16 bits reading
     spi_transaction_t t = {
         .length    = 16,
         .rxlength  = 16,
-        .rx_buffer = &data,
+        .rx_buffer = &rx,
     };
 
     ESP_RETURN_ON_ERROR(spi_device_acquire_bus(handle->spi_handle, portMAX_DELAY), TAG,
@@ -75,6 +75,17 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
     cs_low(handle);
     ESP_GOTO_ON_ERROR(spi_device_polling_transmit(handle->spi_handle, &t), done, TAG, "Failed to transmit reading");
 
+    /* combine bytes*/
+    uint16_t data = ((uint16_t)rx[0] << 8) | rx[1];
+
+    if (data & BIT(2)) {
+        ret = ESP_ERR_INVALID_RESPONSE;
+        goto done;
+    }
+
+    /* get the temperature bits (14:3) from data */
+    uint16_t raw = (data) & 0x0FFF;
+
 done:
     cs_high(handle);
     spi_device_release_bus(handle->spi_handle);
@@ -82,11 +93,6 @@ done:
     if (ret != ESP_OK)
         return ret;
 
-    /* get the temperature bits (14:3) from data */
-    uint16_t raw = (data >> 3) & 0x0FFF;
-
-    /* temperature resolution = 0.25 */
-    raw *= 0.25;
     *out_raw = raw;
 
     return ESP_OK;

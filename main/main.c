@@ -14,12 +14,18 @@ static void setup_memory(void) {
     if (ads_data_g == NULL) {
         ESP_LOGE(TAG_MAIN, "Failed to allocate PSRAM for ADS data");
         // IMPLEMENTAR ERROR HANDLING -------------------------------
+
+        sys_event_t evt = EVT_FATAL_ERROR;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
         return;
     }
 
     if (max_data_g == NULL) {
         ESP_LOGE(TAG_MAIN, "Failed to allocate PSRAM for MAX data");
         // IMPLEMENTAR ERROR HANDLING -------------------------------
+
+        sys_event_t evt = EVT_FATAL_ERROR;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
         return;
     }
 }
@@ -80,8 +86,8 @@ static void setup_nvs(bool format_mode) {
     int32_t sd_num  = 0;
     int32_t lfs_num = 0;
 
-    nvs_get_i32(nvs_handle, "sd_counter", &sd_num);
-    nvs_get_i32(nvs_handle, "lfs_counter", &lfs_num);
+    nvs_get_u32(nvs_handle, "sd_counter", &sd_num);
+    nvs_get_u32(nvs_handle, "lfs_counter", &lfs_num);
 
     if (format_mode) {
         sd_num  = 0;
@@ -204,13 +210,14 @@ void app_main(void) {
 
     /* Create Tasks */
     // Verificar parametros de criação das task
-    // task log ?
     xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskAds, 1);
     xTaskCreatePinnedToCore(task_max, "MAX", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 0);
-    xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 1);
-    // task littlefs
+    xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 8, NULL, 1);
+    xTaskCreatePinnedToCore(task_lfs, "LittleFS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(task_nvs, "NVS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(task_lora, "LoRa", configMINIMAL_STACK_SIZE * 8, NULL, 3, &xTaskLora, 1);
+    // task log ?
 
     xEventGroupSetBits(xSystemEvent, IDLE);
 }
