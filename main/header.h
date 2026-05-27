@@ -75,15 +75,16 @@
 
 /* STATUS FLAGS */
 #define IDLE      BIT(0)
-#define ARMED     BIT(1)
-#define FULL_ACQ  BIT(2)
-#define PART_ACQ  BIT(3)
-#define SD_DONE   BIT(4)
-#define LFS_DONE  BIT(5)
-#define SAVE_DATA BIT(6)
-#define NVS_EDIT  BIT(7)
-#define SEND_DATA BIT(8)
-#define END_TEST  BIT(9)
+#define LORA_INIT BIT(1)
+#define ARMED     BIT(2)
+#define FULL_ACQ  BIT(3)
+#define PART_ACQ  BIT(4)
+#define SD_DONE   BIT(5)
+#define LFS_DONE  BIT(6)
+#define SAVE_DATA BIT(7)
+#define NVS_EDIT  BIT(8)
+#define SEND_DATA BIT(9)
+#define END_TEST  BIT(10)
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {

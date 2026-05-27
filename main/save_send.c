@@ -255,7 +255,7 @@ static void lora_init(sx126x_handle_t *lora_handle) {
 
 void task_lora(void *pvParameters) {
     sx126x_handle_t lora_handle;
-    bool            err;
+    bool            ok;
     uint16_t        lost;
 
     lora_init(&lora_handle);
@@ -269,19 +269,22 @@ void task_lora(void *pvParameters) {
     /* SX1262 DIO1 ISR initialization */
     ESP_ERROR_CHECK(gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL));
 
+    EventBits_t bits = xEventGroupSetBits(xSystemEvent, LORA_INIT);
     xEventGroupWaitBits(xSystemEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Send ADS samples */
     for (uint32_t i = 0; i < sys_data_g.ads_sample; i++) {
         ClearIrqStatus(lora_handle, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT);
-        err = LoRaSend(lora_handle, (uint8_t *)&ads_data_g[i], sizeof(ads_data_t), SX126x_TXMODE_ASYNC);
-        if (err) {
+        ok = LoRaSend(lora_handle, (uint8_t *)&ads_data_g[i], sizeof(ads_data_t), SX126x_TXMODE_ASYNC);
+        if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
         }
+
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
         }
+
         uint16_t irq = GetIrqStatus(lora_handle);
         if (irq != 0) {
             ClearIrqStatus(lora_handle, irq);
@@ -293,19 +296,22 @@ void task_lora(void *pvParameters) {
     /* Send MAX samples */
     for (uint32_t i = 0; i < sys_data_g.max_sample; i++) {
         ClearIrqStatus(lora_handle, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT);
-        err = LoRaSend(lora_handle, (uint8_t *)&max_data_g[i], sizeof(max_data_t), SX126x_TXMODE_ASYNC);
-        if (err) {
+        ok = LoRaSend(lora_handle, (uint8_t *)&max_data_g[i], sizeof(max_data_t), SX126x_TXMODE_ASYNC);
+        if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
         }
+
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
         }
+
         uint16_t irq = GetIrqStatus(lora_handle);
         if (irq != 0) {
             ClearIrqStatus(lora_handle, irq);
         }
     }
+
     lost = GetPacketLost(lora_handle);
     ESP_LOGI(TAG_LORA, "Samples lost: %u", lost);
 

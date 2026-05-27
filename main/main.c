@@ -109,10 +109,10 @@ void task_status(void *pvParameters) {
             continue;
 
         switch (evt) {
-
         case EVT_ARM:
             ESP_LOGI(TAG_SYS, "IDLE -> ARMED");
             xEventGroupClearBits(xSystemEvent, IDLE);
+            xEventGroupClearBits(xSystemEvent, LORA_INIT);
             xEventGroupSetBits(xSystemEvent, ARMED);
             break;
 
@@ -214,7 +214,9 @@ void app_main(void) {
     /* Create Tasks */
     // Verificar parametros de criação das task
     xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
-    xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskAds, 1);
+    xTaskCreatePinnedToCore(task_arm, "ARM", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(task_ignition, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 8, &xTaskAds, 1);
     xTaskCreatePinnedToCore(task_max, "MAX", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 8, NULL, 1);
     xTaskCreatePinnedToCore(task_lfs, "LittleFS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 0);

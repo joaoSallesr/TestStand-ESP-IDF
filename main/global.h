@@ -20,6 +20,8 @@ extern TaskHandle_t xTaskLora;
 
 /* TASKS */
 void task_status(void *pvParameters);
+void task_arm(void *pvParameters);
+void task_ignition(void *pvParameters);
 void task_ads(void *pvParameters);
 void task_max(void *pvParameters);
 void task_sd(void *pvParameters);
