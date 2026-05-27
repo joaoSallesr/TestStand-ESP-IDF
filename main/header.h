@@ -58,7 +58,7 @@
 #define MAX3_CS       GPIO_NUM_18
 #define MAX3_DRDY     GPIO_NUM_6
 #define LORA_CS       GPIO_NUM_14
-#define LORA_DIO1     GPIO_NUM_15 // LORA_DRDY
+#define LORA_DIO1     GPIO_NUM_2 // LORA_DRDY
 #define LORA_BUSY     GPIO_NUM_41
 #define LORA_RESET    GPIO_NUM_40
 
