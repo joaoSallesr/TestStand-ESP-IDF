@@ -280,6 +280,7 @@ void task_lora(void *pvParameters) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
         }
+        publish_fault();
 
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);

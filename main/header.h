@@ -121,6 +121,7 @@ typedef struct __attribute__((packed)) {
     bool     format;
 } file_counter_t;
 
+/* EVENT STRUCTURES */
 typedef enum {
     EVT_SETUP,     // setup finished
     EVT_ARM,       // system armed
@@ -133,5 +134,25 @@ typedef enum {
 } status_event_t;
 
 typedef enum {
-    EVT_FATAL_ERROR, // fatal error detected -> stop ignition
+    FAULT_MEMORY,
+    FAULT_SPI,
+    FAULT_GPIO,
+    FAULT_NVS,
+    FAULT_SD,
+    FAULT_LFS,
+    FAULT_LORA,
+} fault_code_t;
+
+typedef enum {
+    EVT_SETUP_OK,
+    EVT_SETUP_FAILED,
+    EVT_FAULT,
+    EVT_ARM,
+    EVT_IGNITION,
+} system_event_type_t;
+
+typedef struct {
+    system_event_type_t type;
+    fault_code_t        fault;
+    esp_err_t           err;
 } system_event_t;

@@ -2,26 +2,22 @@
 
 static const char *TAG_MAIN = "main";
 
+#define EVENT_QUEUE_SIZE 10
+
 void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
-    xTaskCreatePinnedToCore(task_setup, "Startup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
-    xEventGroupSetBits(xStatusEvent, SETUP);
 
-    // TESTAR
-    ESP_LOGI(TAG_MAIN,
-             "[ BEFORE ] - Free Heap: %u bytes\n"
-             "  MALLOC_CAP_8BIT      %7zu bytes\n"
-             "  MALLOC_CAP_DMA       %7zu bytes\n"
-             "  MALLOC_CAP_SPIRAM    %7zu bytes\n"
-             "  MALLOC_CAP_INTERNAL  %7zu bytes\n"
-             "  MALLOC_CAP_DEFAULT   %7zu bytes\n"
-             "  MALLOC_CAP_IRAM_8BIT %7zu bytes\n"
-             "  MALLOC_CAP_RETENTION %7zu bytes\n",
-             xPortGetFreeHeapSize(), heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_DMA),
-             heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-             heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
-             heap_caps_get_free_size(MALLOC_CAP_RETENTION));
-    // TESTAR
+    /* Create Queue */
+    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
+
+    /* Create Event Group */
+    xStatusEvent = xEventGroupCreate();
+    xSystemEvent = xEventGroupCreate();
+
+    /* Setup Tasks */
+    xTaskCreatePinnedToCore(task_setup, "Setup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
+    xEventGroupSetBits(xStatusEvent, SETUP);
 
     vTaskDelay(pdMS_TO_TICKS(150)); // Wait for peripherals to stabilize
 
@@ -29,25 +25,8 @@ void app_main(void) {
 
     // FORMAT MODE (NVS, SD, LFS) =====================================================================================
 
-    // TESTAR
-    ESP_LOGI(TAG_MAIN,
-             "[ AFTER ] - Free Heap: %u bytes\n"
-             "  MALLOC_CAP_8BIT      %7zu bytes\n"
-             "  MALLOC_CAP_DMA       %7zu bytes\n"
-             "  MALLOC_CAP_SPIRAM    %7zu bytes\n"
-             "  MALLOC_CAP_INTERNAL  %7zu bytes\n"
-             "  MALLOC_CAP_DEFAULT   %7zu bytes\n"
-             "  MALLOC_CAP_IRAM_8BIT %7zu bytes\n"
-             "  MALLOC_CAP_RETENTION %7zu bytes\n",
-             xPortGetFreeHeapSize(), heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_DMA),
-             heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-             heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
-             heap_caps_get_free_size(MALLOC_CAP_RETENTION));
-    // TESTAR
-
-    /* Create Tasks */
+    /* Peripherals Tasks */
     // Verificar parametros de criação das task
-    xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(task_arm, "ARM", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(task_ignition, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 8, &xTaskAds, 1);

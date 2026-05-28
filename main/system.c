@@ -2,10 +2,23 @@
 
 static const char *TAG_SYS = "SYS";
 
-#define FORMAT_MODE      false
-#define EVENT_QUEUE_SIZE 10
+#define FORMAT_MODE false
 
-static void setup_memory(void) {
+static esp_err_t setup_memory(void) {
+    ESP_LOGI(TAG_SYS,
+             "[ BEFORE ] - Free Heap: %u bytes\n"
+             "  MALLOC_CAP_8BIT      %7zu bytes\n"
+             "  MALLOC_CAP_DMA       %7zu bytes\n"
+             "  MALLOC_CAP_SPIRAM    %7zu bytes\n"
+             "  MALLOC_CAP_INTERNAL  %7zu bytes\n"
+             "  MALLOC_CAP_DEFAULT   %7zu bytes\n"
+             "  MALLOC_CAP_IRAM_8BIT %7zu bytes\n"
+             "  MALLOC_CAP_RETENTION %7zu bytes\n",
+             xPortGetFreeHeapSize(), heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_DMA),
+             heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
+             heap_caps_get_free_size(MALLOC_CAP_RETENTION));
+
     // sdkconfig -> + Support for external, SPI-connected RAM
     ads_data_g = (ads_data_t *)heap_caps_aligned_alloc(4, ADS_SAMPLES * sizeof(ads_data_t), MALLOC_CAP_SPIRAM);
     max_data_g = (max_data_t *)heap_caps_aligned_alloc(4, MAX_SAMPLES * sizeof(max_data_t), MALLOC_CAP_SPIRAM);
@@ -16,7 +29,7 @@ static void setup_memory(void) {
 
         status_event_t evt = EVT_FATAL_ERROR;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-        return;
+        return ESP_ERR_NO_MEM;
     }
 
     if (max_data_g == NULL) {
@@ -25,11 +38,29 @@ static void setup_memory(void) {
 
         status_event_t evt = EVT_FATAL_ERROR;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-        return;
+        return ESP_ERR_NO_MEM;
     }
+
+    ESP_LOGI(TAG_SYS,
+             "[ AFTER ] - Free Heap: %u bytes\n"
+             "  MALLOC_CAP_8BIT      %7zu bytes\n"
+             "  MALLOC_CAP_DMA       %7zu bytes\n"
+             "  MALLOC_CAP_SPIRAM    %7zu bytes\n"
+             "  MALLOC_CAP_INTERNAL  %7zu bytes\n"
+             "  MALLOC_CAP_DEFAULT   %7zu bytes\n"
+             "  MALLOC_CAP_IRAM_8BIT %7zu bytes\n"
+             "  MALLOC_CAP_RETENTION %7zu bytes\n",
+             xPortGetFreeHeapSize(), heap_caps_get_free_size(MALLOC_CAP_8BIT), heap_caps_get_free_size(MALLOC_CAP_DMA),
+             heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             heap_caps_get_free_size(MALLOC_CAP_DEFAULT), heap_caps_get_free_size(MALLOC_CAP_IRAM_8BIT),
+             heap_caps_get_free_size(MALLOC_CAP_RETENTION));
+
+    return ESP_OK;
 }
 
-static void setup_peripherals(void) {
+static esp_err_t setup_peripherals(void) {
+    esp_err_t err = ESP_OK;
+
     /* SPI bus configuration */
     spi_bus_config_t spi_bus_cfg = {
         .mosi_io_num     = MOSI,
@@ -43,7 +74,10 @@ static void setup_peripherals(void) {
     /* SPI bus intialization */
     spi_host_device_t host     = SPI_HOST;
     spi_dma_chan_t    dma_chan = DMA_CHAN;
-    ESP_ERROR_CHECK(spi_bus_initialize(host, &spi_bus_cfg, dma_chan));
+
+    err = spi_bus_initialize(host, &spi_bus_cfg, dma_chan);
+    if (err != ESP_OK)
+        return err;
 
     /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
@@ -67,6 +101,8 @@ static void setup_peripherals(void) {
     ESP_ERROR_CHECK(gpio_config(&drdy_conf));
     ESP_ERROR_CHECK(gpio_config(&dio1_conf));
     gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+
+    return err;
 }
 
 static void setup_nvs(bool format_mode) {
@@ -101,12 +137,7 @@ static void setup_nvs(bool format_mode) {
 }
 
 void task_setup(void *pvParameters) {
-    /* Create Queue */
-    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
-
-    /* Create Event Group */
-    xStatusEvent = xEventGroupCreate();
-    xSystemEvent = xEventGroupCreate();
+    esp_err_t err = ESP_OK;
 
     ESP_LOGE(TAG_SYS, "Allocating PSRAM");
     setup_memory();
@@ -117,8 +148,12 @@ void task_setup(void *pvParameters) {
     ESP_LOGE(TAG_SYS, "NVS flash init");
     setup_nvs(FORMAT_MODE);
 
-    status_event_t evt = EVT_SETUP;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    if (err == ESP_OK) {
+        status_event_t evt = EVT_SETUP;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+
+        vTaskDelete(NULL);
+    }
 }
 
 void task_status(void *pvParameters) {
