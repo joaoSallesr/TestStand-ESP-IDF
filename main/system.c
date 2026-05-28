@@ -25,19 +25,13 @@ static esp_err_t setup_memory(void) {
 
     if (ads_data_g == NULL) {
         ESP_LOGE(TAG_SYS, "Failed to allocate PSRAM for ADS data");
-        // IMPLEMENTAR ERROR HANDLING -------------------------------
 
-        status_event_t evt = EVT_FATAL_ERROR;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
         return ESP_ERR_NO_MEM;
     }
 
     if (max_data_g == NULL) {
         ESP_LOGE(TAG_SYS, "Failed to allocate PSRAM for MAX data");
-        // IMPLEMENTAR ERROR HANDLING -------------------------------
 
-        status_event_t evt = EVT_FATAL_ERROR;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
         return ESP_ERR_NO_MEM;
     }
 
@@ -76,8 +70,10 @@ static esp_err_t setup_peripherals(void) {
     spi_dma_chan_t    dma_chan = DMA_CHAN;
 
     err = spi_bus_initialize(host, &spi_bus_cfg, dma_chan);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_SYS, "Failed to initialize SPI bus");
         return err;
+    }
 
     /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
@@ -98,14 +94,28 @@ static esp_err_t setup_peripherals(void) {
     };
 
     /* Apply ISR */
-    ESP_ERROR_CHECK(gpio_config(&drdy_conf));
-    ESP_ERROR_CHECK(gpio_config(&dio1_conf));
-    gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    err = gpio_config(&drdy_conf);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_SYS, "Failed to apply DRDY config");
+        return err;
+    }
+
+    err = gpio_config(&dio1_conf);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_SYS, "Failed to apply DIO1 config");
+        return err;
+    }
+
+    err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_SYS, "Failed to start ISR");
+        return err;
+    }
 
     return err;
 }
 
-static void setup_nvs(bool format_mode) {
+static esp_err_t setup_nvs(bool format_mode) {
     esp_err_t err = nvs_flash_init();
 
     if (err != ESP_OK) {
@@ -134,22 +144,36 @@ static void setup_nvs(bool format_mode) {
     file_counter_g.sd_files  = sd_num;
     file_counter_g.lfs_files = lfs_num;
     file_counter_g.format    = format_mode;
+
+    return err;
 }
 
 void task_setup(void *pvParameters) {
     esp_err_t err = ESP_OK;
 
     ESP_LOGE(TAG_SYS, "Allocating PSRAM");
-    setup_memory();
+    err = setup_memory();
+    if (err != ESP_OK) {
+        status_event_t evt = EVT_SETUP_FAILED;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    }
 
     ESP_LOGE(TAG_SYS, "GPIO configuration");
-    setup_peripherals();
+    err = setup_peripherals();
+    if (err != ESP_OK) {
+        status_event_t evt = EVT_SETUP_FAILED;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    }
 
     ESP_LOGE(TAG_SYS, "NVS flash init");
-    setup_nvs(FORMAT_MODE);
+    err = setup_nvs(FORMAT_MODE);
+    if (err != ESP_OK) {
+        status_event_t evt = EVT_SETUP_FAILED;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    }
 
     if (err == ESP_OK) {
-        status_event_t evt = EVT_SETUP;
+        status_event_t evt = EVT_SETUP_OK;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
         vTaskDelete(NULL);
@@ -165,10 +189,16 @@ void task_status(void *pvParameters) {
 
         switch (evt) {
 
-        case EVT_SETUP:
+        case EVT_SETUP_OK:
             ESP_LOGI(TAG_SYS, "SETUP -> IDLE");
             xEventGroupClearBits(xStatusEvent, SETUP);
             xEventGroupSetBits(xStatusEvent, IDLE);
+            break;
+
+        case EVT_SETUP_FAILED:
+            ESP_LOGI(TAG_SYS, "SETUP -> FAIL");
+            xEventGroupClearBits(xStatusEvent, SETUP);
+            xEventGroupSetBits(xStatusEvent, FATAL_ERROR);
             break;
 
         case EVT_ARM:
@@ -177,7 +207,7 @@ void task_status(void *pvParameters) {
             xEventGroupSetBits(xStatusEvent, ARMED);
             break;
 
-        case EVT_IGNITION:
+        case EVT_IGNITION_DONE:
             ESP_LOGI(TAG_SYS, "ARMED -> FULL_ACQ");
             xEventGroupClearBits(xStatusEvent, ARMED);
             xEventGroupSetBits(xStatusEvent, FULL_ACQ);

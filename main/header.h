@@ -38,32 +38,32 @@
 #define HIGH 1
 
 /* GPIO */
-#define BUZZER_GPIO   GPIO_NUM_4
-#define IGNITOR_GPIO  GPIO_NUM_5
-#define SQUIB_GPIO    GPIO_NUM_7
-#define MOSI          GPIO_NUM_11
-#define MISO          GPIO_NUM_13
-#define CLK           GPIO_NUM_12
-#define SD_DAT0       GPIO_NUM_37
-#define SD_DAT1       GPIO_NUM_35
-#define SD_DAT2       GPIO_NUM_39
-#define SD_DAT3       GPIO_NUM_48
-#define SD_CLK        GPIO_NUM_36
-#define SD_CMD        GPIO_NUM_38
-#define LOADCELL_CS   GPIO_NUM_8
-#define LOADCELL_DRDY GPIO_NUM_21
-#define LOADCELL_SYNC GPIO_NUM_9
-#define TRANS_CS      GPIO_NUM_42
-#define TRANS_DRDY    GPIO_NUM_10
-#define TRANS_SYNC    GPIO_NUM_47
-#define MAX1_CS       GPIO_NUM_16
-#define MAX2_CS       GPIO_NUM_17
-#define MAX3_CS       GPIO_NUM_18
-#define MAX3_DRDY     GPIO_NUM_6
-#define LORA_CS       GPIO_NUM_14
-#define LORA_DIO1     GPIO_NUM_2 // LORA_DRDY
-#define LORA_BUSY     GPIO_NUM_41
-#define LORA_RESET    GPIO_NUM_40
+#define COMANDO_BUZZER  GPIO_NUM_4
+#define COMANDO_IGNITOR GPIO_NUM_5
+#define LEITURA_SQUIB   GPIO_NUM_7
+#define MOSI            GPIO_NUM_11
+#define MISO            GPIO_NUM_13
+#define CLK             GPIO_NUM_12
+#define SD_DAT0         GPIO_NUM_37
+#define SD_DAT1         GPIO_NUM_35
+#define SD_DAT2         GPIO_NUM_39
+#define SD_DAT3         GPIO_NUM_48
+#define SD_CLK          GPIO_NUM_36
+#define SD_CMD          GPIO_NUM_38
+#define LOADCELL_CS     GPIO_NUM_8
+#define LOADCELL_DRDY   GPIO_NUM_21
+#define LOADCELL_SYNC   GPIO_NUM_9
+#define TRANS_CS        GPIO_NUM_42
+#define TRANS_DRDY      GPIO_NUM_10
+#define TRANS_SYNC      GPIO_NUM_47
+#define MAX1_CS         GPIO_NUM_16
+#define MAX2_CS         GPIO_NUM_17
+#define MAX3_CS         GPIO_NUM_18
+#define MAX3_DRDY       GPIO_NUM_6
+#define LORA_CS         GPIO_NUM_14
+#define LORA_DIO1       GPIO_NUM_2 // LORA_DRDY
+#define LORA_BUSY       GPIO_NUM_41
+#define LORA_RESET      GPIO_NUM_40
 
 /* SPI CONFIG */
 #define SPI_HOST SPI2_HOST
@@ -77,17 +77,18 @@
 #define PARTIAL_ACQ_DURATION_MS 20000
 
 /* STATUS FLAGS */
-#define SETUP     BIT(0)
-#define IDLE      BIT(1)
-#define ARMED     BIT(2)
-#define FULL_ACQ  BIT(3)
-#define PART_ACQ  BIT(4)
-#define SD_DONE   BIT(5)
-#define LFS_DONE  BIT(6)
-#define SAVE_DATA BIT(7)
-#define NVS_EDIT  BIT(8)
-#define SEND_DATA BIT(9)
-#define END_TEST  BIT(10)
+#define SETUP       BIT(0)
+#define IDLE        BIT(1)
+#define ARMED       BIT(2)
+#define FULL_ACQ    BIT(3)
+#define PART_ACQ    BIT(4)
+#define SD_DONE     BIT(5)
+#define LFS_DONE    BIT(6)
+#define SAVE_DATA   BIT(7)
+#define NVS_EDIT    BIT(8)
+#define SEND_DATA   BIT(9)
+#define END_TEST    BIT(10)
+#define FATAL_ERROR BIT(11)
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
@@ -123,36 +124,22 @@ typedef struct __attribute__((packed)) {
 
 /* EVENT STRUCTURES */
 typedef enum {
-    EVT_SETUP,     // setup finished
-    EVT_ARM,       // system armed
-    EVT_IGNITION,  // ignition started
-    EVT_ADS_DONE,  // task_ads finished full acquisition
-    EVT_MAX_DONE,  // task_max finished
-    EVT_SAVE_DONE, // sd and lfs finished writing
-    EVT_SEND_DONE, // task_lora finished sending
-    EVT_NVS_DONE,  // task_nvs finished
+    EVT_SETUP_OK,
+    EVT_SETUP_FAILED,
+    EVT_ARM,            // system armed
+    EVT_IGNITION_START, // ignition started
+    EVT_IGNITION_DONE,  // ignition finished
+    EVT_ADS_DONE,       // task_ads finished full acquisition
+    EVT_MAX_DONE,       // task_max finished
+    EVT_SAVE_DONE,      // sd and lfs finished writing
+    EVT_SEND_DONE,      // task_lora finished sending
+    EVT_NVS_DONE,       // task_nvs finished
 } status_event_t;
 
 typedef enum {
-    FAULT_MEMORY,
-    FAULT_SPI,
-    FAULT_GPIO,
-    FAULT_NVS,
-    FAULT_SD,
-    FAULT_LFS,
-    FAULT_LORA,
-} fault_code_t;
-
-typedef enum {
-    EVT_SETUP_OK,
-    EVT_SETUP_FAILED,
-    EVT_FAULT,
-    EVT_ARM,
-    EVT_IGNITION,
-} system_event_type_t;
-
-typedef struct {
-    system_event_type_t type;
-    fault_code_t        fault;
-    esp_err_t           err;
-} system_event_t;
+    EVT_SPI_FAILED,
+    EVT_ALLOC_FAILED,
+    EVT_DRDY_FAILED,
+    EVT_DIO1_FAILED,
+    EVT_ISR_FAILED,
+} error_event_t;

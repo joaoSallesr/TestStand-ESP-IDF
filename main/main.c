@@ -17,18 +17,13 @@ void app_main(void) {
     /* Setup Tasks */
     xTaskCreatePinnedToCore(task_setup, "Setup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
-    xEventGroupSetBits(xStatusEvent, SETUP);
 
     vTaskDelay(pdMS_TO_TICKS(150)); // Wait for peripherals to stabilize
-
-    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
-
-    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
 
     /* Peripherals Tasks */
     // Verificar parametros de criação das task
     xTaskCreatePinnedToCore(task_arm, "ARM", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(task_ignition, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(task_ignition, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
     xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 8, &xTaskAds, 1);
     xTaskCreatePinnedToCore(task_max, "MAX", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 8, NULL, 1);
@@ -36,4 +31,8 @@ void app_main(void) {
     xTaskCreatePinnedToCore(task_nvs, "NVS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 1);
     xTaskCreatePinnedToCore(task_lora, "LoRa", configMINIMAL_STACK_SIZE * 8, NULL, 3, &xTaskLora, 1);
     // task log ?
+
+    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
+
+    // FORMAT MODE (NVS, SD, LFS) =====================================================================================
 }

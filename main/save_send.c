@@ -269,7 +269,11 @@ void task_lora(void *pvParameters) {
     /* SX1262 DIO1 ISR initialization */
     ESP_ERROR_CHECK(gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL));
 
-    // xEventGroupSetBits(xStatusEvent, LORA_INIT);
+    xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
+
+    // LORA RECEIVE
+    // EVENT IGNIÇÃO
+
     xEventGroupWaitBits(xStatusEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Send ADS samples */
@@ -280,7 +284,6 @@ void task_lora(void *pvParameters) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
         }
-        publish_fault();
 
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
