@@ -2,17 +2,18 @@
 
 static const char *TAG_MAIN = "main";
 
-#define EVENT_QUEUE_SIZE 10
+#define EVENT_QUEUE_SIZE    10
+#define IGNITION_QUEUE_SIZE 1
 
 void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
 
     /* Create Queue */
-    xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
+    xEventQueue    = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
+    xIgnitionQueue = xQueueCreate(IGNITION_QUEUE_SIZE, sizeof(ignition_event_t));
 
     /* Create Event Group */
     xStatusEvent = xEventGroupCreate();
-    xSystemEvent = xEventGroupCreate();
 
     /* Setup Tasks */
     xTaskCreatePinnedToCore(task_setup, "Setup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);

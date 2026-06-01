@@ -75,6 +75,17 @@ static esp_err_t setup_peripherals(void) {
         return err;
     }
 
+    /* GPIO Initalization */
+    gpio_reset_pin(BUZZER_GPIO);
+    gpio_set_direction(BUZZER_GPIO, GPIO_MODE_OUTPUT);
+
+    gpio_set_direction(SQUIB_GPIO, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(SQUIB_GPIO, GPIO_PULLUP_ONLY);
+
+    gpio_reset_pin(IGNITION_GPIO);
+    gpio_set_direction(IGNITION_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(IGNITION_GPIO, LOW);
+
     /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
         .pin_bit_mask = (1ULL << LOADCELL_DRDY),
@@ -112,6 +123,13 @@ static esp_err_t setup_peripherals(void) {
         return err;
     }
 
+    if (xEventQueue == NULL)
+        return ESP_ERR_INVALID_ARG;
+    if (xIgnitionQueue == NULL)
+        return ESP_ERR_INVALID_ARG;
+    if (xStatusEvent == NULL)
+        return ESP_ERR_INVALID_ARG;
+
     return err;
 }
 
@@ -120,13 +138,17 @@ static esp_err_t setup_nvs(bool format_mode) {
 
     if (err != ESP_OK) {
         ESP_LOGE("NVS", "%s, erasing NVS partition...", esp_err_to_name(err));
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
+        nvs_flash_erase();
+        err = nvs_flash_init();
+        if (err != ESP_OK)
+            return err;
     }
 
     nvs_handle_t nvs_handle;
     ESP_LOGI("NVS", "Opening Non-Volatile Storage (NVS) handle... ");
-    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
+    err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK)
+        return err;
 
     uint32_t sd_num  = 0;
     uint32_t lfs_num = 0;
@@ -151,25 +173,31 @@ static esp_err_t setup_nvs(bool format_mode) {
 void task_setup(void *pvParameters) {
     esp_err_t err = ESP_OK;
 
-    ESP_LOGE(TAG_SYS, "Allocating PSRAM");
+    ESP_LOGI(TAG_SYS, "Allocating PSRAM");
     err = setup_memory();
     if (err != ESP_OK) {
         status_event_t evt = EVT_SETUP_FAILED;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+
+        vTaskDelete(NULL);
     }
 
-    ESP_LOGE(TAG_SYS, "GPIO configuration");
+    ESP_LOGI(TAG_SYS, "GPIO configuration");
     err = setup_peripherals();
     if (err != ESP_OK) {
         status_event_t evt = EVT_SETUP_FAILED;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+
+        vTaskDelete(NULL);
     }
 
-    ESP_LOGE(TAG_SYS, "NVS flash init");
+    ESP_LOGI(TAG_SYS, "NVS flash init");
     err = setup_nvs(FORMAT_MODE);
     if (err != ESP_OK) {
         status_event_t evt = EVT_SETUP_FAILED;
         xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+
+        vTaskDelete(NULL);
     }
 
     if (err == ESP_OK) {
@@ -190,38 +218,56 @@ void task_status(void *pvParameters) {
         switch (evt) {
 
         case EVT_SETUP_OK:
-            ESP_LOGI(TAG_SYS, "SETUP -> IDLE");
-            xEventGroupClearBits(xStatusEvent, SETUP);
-            xEventGroupSetBits(xStatusEvent, IDLE);
+            ESP_LOGI(TAG_SYS, "SETUP_START -> SETUP_OK");
+            xEventGroupClearBits(xStatusEvent, SETUP_START);
+            xEventGroupSetBits(xStatusEvent, SETUP_OK);
             break;
 
         case EVT_SETUP_FAILED:
-            ESP_LOGI(TAG_SYS, "SETUP -> FAIL");
-            xEventGroupClearBits(xStatusEvent, SETUP);
-            xEventGroupSetBits(xStatusEvent, FATAL_ERROR);
+            ESP_LOGI(TAG_SYS, "SETUP -> SETUP_FAIL");
+            xEventGroupClearBits(xStatusEvent, SETUP_START);
+            xEventGroupSetBits(xStatusEvent, SETUP_FAIL);
             break;
 
         case EVT_ARM:
-            ESP_LOGI(TAG_SYS, "IDLE -> ARMED");
-            xEventGroupClearBits(xStatusEvent, IDLE);
+            ESP_LOGI(TAG_SYS, "SETUP_OK -> ARMED");
+            xEventGroupClearBits(xStatusEvent, SETUP_OK);
             xEventGroupSetBits(xStatusEvent, ARMED);
             break;
 
         case EVT_IGNITION_DONE:
-            ESP_LOGI(TAG_SYS, "ARMED -> FULL_ACQ");
+            ESP_LOGI(TAG_SYS, "ARMED -> ACQUIRE");
             xEventGroupClearBits(xStatusEvent, ARMED);
-            xEventGroupSetBits(xStatusEvent, FULL_ACQ);
+            xEventGroupSetBits(xStatusEvent, ACQUIRE);
             break;
 
-        case EVT_ADS_DONE:
-            ESP_LOGI(TAG_SYS, "FULL_ACQ -> PART_ACQ");
-            xEventGroupClearBits(xStatusEvent, FULL_ACQ);
-            xEventGroupSetBits(xStatusEvent, PART_ACQ);
-            break;
+        case EVT_ADS_DONE: {
+            ESP_LOGI(TAG_SYS, "ACQUIRE + ADS_DONE");
+            EventBits_t bits = xEventGroupSetBits(xStatusEvent, ADS_DONE);
 
-        case EVT_MAX_DONE:
-            ESP_LOGI(TAG_SYS, "PART_ACQ -> SAVE_DATA");
-            xEventGroupClearBits(xStatusEvent, PART_ACQ);
+            if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
+                status_event_t evt = EVT_ACQUIRE_DONE;
+                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+            }
+            break;
+        }
+
+        case EVT_MAX_DONE: {
+            ESP_LOGI(TAG_SYS, "ACQUIRE + MAX_DONE");
+            EventBits_t bits = xEventGroupSetBits(xStatusEvent, MAX_DONE);
+
+            if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
+                status_event_t evt = EVT_ACQUIRE_DONE;
+                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+            }
+            break;
+        }
+
+        case EVT_ACQUIRE_DONE:
+            ESP_LOGI(TAG_SYS, "ACQUIRE -> SAVE_DATA");
+            xEventGroupClearBits(xStatusEvent, ACQUIRE);
+            xEventGroupClearBits(xStatusEvent, ADS_DONE);
+            xEventGroupClearBits(xStatusEvent, MAX_DONE);
             xEventGroupSetBits(xStatusEvent, SAVE_DATA);
             break;
 
@@ -251,22 +297,18 @@ void task_status(void *pvParameters) {
 
 void task_arm(void *pvParameters) {
     /* Wait for idle */
-    xEventGroupWaitBits(xStatusEvent, IDLE, pdFALSE, pdTRUE, portMAX_DELAY);
+    EventBits_t bits = xEventGroupWaitBits(xStatusEvent, SETUP_OK | SETUP_FAIL, pdFALSE, pdFALSE, portMAX_DELAY);
 
-    // TODO:
-    // Armar sistema ao receber sinal ARMED da base
-
-    while (true) {
-
-        // true -> receber sinal ARMED
-        if (true) {
-            ESP_LOGW(TAG_SYS, "SYSTEM ARMED");
-            break;
-        }
+    /* Check before Arming */
+    if (bits & SETUP_OK) {
+        ESP_LOGW(TAG_SYS, "SYSTEM ARMED");
+        status_event_t evt = EVT_ARM;
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
-    status_event_t evt = EVT_ARM;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    if (bits & SETUP_FAIL) {
+        ESP_LOGW(TAG_SYS, "SYSTEM ERROR - ABORTING TEST");
+    }
 
     vTaskDelete(NULL);
 }

@@ -6,13 +6,13 @@ static const char *TAG_MAX = "MAX";
 
 bool max_check(int64_t max_start) {
     bool buffer_full  = sys_data_g.max_sample >= MAX_SAMPLES;
-    bool time_elapsed = (esp_timer_get_time() - max_start) >= (PARTIAL_ACQ_DURATION_MS * 1000);
+    bool time_elapsed = (esp_timer_get_time() - max_start) >= (MAX_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xStatusEvent) & (FULL_ACQ | PART_ACQ))) {
+    if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_MAX_DONE;
             xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-            ESP_LOGI(TAG_MAX, "Partial acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
+            ESP_LOGI(TAG_MAX, "MAX acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
         }
@@ -44,7 +44,7 @@ void task_max(void *pvParameters) {
     max_init(&max2_handle, MAX2_CS);
 
     /* Wait for acquisition to start */
-    xEventGroupWaitBits(xStatusEvent, FULL_ACQ, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t max_start = esp_timer_get_time();
 

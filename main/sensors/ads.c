@@ -13,13 +13,13 @@ static void IRAM_ATTR drdy_isr_handler(void *arg) {
 
 bool ads_check(int64_t ads_start) {
     bool buffer_full  = sys_data_g.ads_sample >= ADS_SAMPLES;
-    bool time_elapsed = (esp_timer_get_time() - ads_start) >= (FULL_ACQ_DURATION_MS * 1000);
+    bool time_elapsed = (esp_timer_get_time() - ads_start) >= (ADS_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xStatusEvent) & FULL_ACQ)) {
+    if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_ADS_DONE;
             xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-            ESP_LOGI(TAG_ADS, "Full acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
+            ESP_LOGI(TAG_ADS, "ADS acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
         }
@@ -82,7 +82,7 @@ void task_ads(void *pvParameters) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(LOADCELL_DRDY, drdy_isr_handler, NULL));
 
     /* Wait for acquisition to start */
-    xEventGroupWaitBits(xStatusEvent, FULL_ACQ, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t ads_start = esp_timer_get_time();
 

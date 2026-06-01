@@ -12,7 +12,6 @@ QueueHandle_t xIgnitionQueue = NULL;
 
 /* EVENT HANDLE*/
 EventGroupHandle_t xStatusEvent = NULL;
-EventGroupHandle_t xSystemEvent = NULL;
 
 /* TASK HANDLE */
 TaskHandle_t xTaskAds  = NULL;

@@ -12,24 +12,22 @@ void task_ignition(void *pvParameters) {
     // Ao receber o sinal envia EVT_IGNITION_START
 
     while (true) {
-        status_event_t evt;
+        ignition_event_t evt;
 
+        /* Wait for ignition */
         if (xQueueReceive(xIgnitionQueue, &evt, portMAX_DELAY) != pdTRUE)
             continue;
 
-        // true -> receber sinal IGNITION
         if (evt == EVT_IGNITION_START) {
-            gpio_set_level(COMANDO_IGNITOR, HIGH);
-            ESP_LOGW(TAG_IGN, "IGNITION STARTED");
-            vTaskDelay(pdMS_TO_TICKS(10)); // ?????????
-            gpio_set_level(COMANDO_IGNITOR, LOW);
-            break;
+            for (int i = 0; i < 3; i++) {
+                gpio_set_level(IGNITION_GPIO, HIGH);
+                ESP_LOGW(TAG_IGN, "IGNITION STARTED");
+                vTaskDelay(pdMS_TO_TICKS(10)); // ?????????
+                gpio_set_level(IGNITION_GPIO, LOW);
+                if (gpio_get_level(SQUIB_GPIO) == LOW)
+                    break;
+            }
         }
-    }
-
-    // Wait for squib reading
-    while (gpio_get_level(LEITURA_SQUIB) == HIGH) {
-        vTaskDelay(pdTICKS_TO_MS(1));
     }
 
     status_event_t evt = EVT_IGNITION_DONE;

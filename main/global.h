@@ -14,7 +14,6 @@ extern QueueHandle_t xIgnitionQueue;
 
 /* EVENT HANDLE*/
 extern EventGroupHandle_t xStatusEvent;
-extern EventGroupHandle_t xSystemEvent;
 
 /* TASK HANDLE */
 extern TaskHandle_t xTaskAds;
