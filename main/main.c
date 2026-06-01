@@ -9,22 +9,24 @@ void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
 
     /* Create Queue */
-    xEventQueue    = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
+    xStatusQueue   = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
     xIgnitionQueue = xQueueCreate(IGNITION_QUEUE_SIZE, sizeof(ignition_event_t));
 
     /* Create Event Group */
     xStatusEvent = xEventGroupCreate();
+    xInitEvent   = xEventGroupCreate();
 
     /* Setup Tasks */
+    xEventGroupSetBits(xStatusEvent, SETUP_START);
     xTaskCreatePinnedToCore(task_setup, "Setup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
-
+    xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskStatus, 0);
     vTaskDelay(pdMS_TO_TICKS(150)); // Wait for peripherals to stabilize
 
     /* Peripherals Tasks */
     // Verificar parametros de criação das task
+    // ==========================================================================
     xTaskCreatePinnedToCore(task_arm, "ARM", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(task_ignition, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(task_ignite, "Ignition", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskIgnite, 0);
     xTaskCreatePinnedToCore(task_ads, "ADS", configMINIMAL_STACK_SIZE * 8, NULL, 8, &xTaskAds, 1);
     xTaskCreatePinnedToCore(task_max, "MAX", configMINIMAL_STACK_SIZE * 8, NULL, 3, NULL, 0);
     xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 8, NULL, 1);

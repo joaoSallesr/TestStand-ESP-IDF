@@ -11,7 +11,7 @@ bool max_check(int64_t max_start) {
     if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_MAX_DONE;
-            xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+            xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_MAX, "MAX acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
@@ -21,7 +21,9 @@ bool max_check(int64_t max_start) {
     return false;
 }
 
-static void max_init(max6675_handle_t *max_handle, gpio_num_t cs_num) {
+static esp_err_t max_init(max6675_handle_t *max_handle, gpio_num_t cs_num) {
+    esp_err_t err;
+
     /* MAX6675 struct setup */
     max6675_config_t max_cfg = {
         .spi_host = SPI_HOST,
@@ -29,21 +31,37 @@ static void max_init(max6675_handle_t *max_handle, gpio_num_t cs_num) {
     };
 
     /* MAX initialization */
-    ESP_ERROR_CHECK(max6675_init(&max_cfg, max_handle));
-    ESP_LOGI(TAG_MAX, "MAX initialized");
+    err = max6675_init(&max_cfg, max_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_MAX, "MAX init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG_MAX, "MAX (gpio: %d) initialized", cs_num);
+    return ESP_OK;
 }
 
 void task_max(void *pvParameters) {
+    esp_err_t err;
+
     max6675_handle_t max1_handle;
     max6675_handle_t max2_handle;
 
     uint16_t current_temperature1_raw;
     uint16_t current_temperature2_raw;
 
-    max_init(&max1_handle, MAX1_CS);
-    max_init(&max2_handle, MAX2_CS);
+    err = max_init(&max1_handle, MAX1_CS);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
 
-    /* Wait for acquisition to start */
+    err = max_init(&max2_handle, MAX2_CS);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
+
+    /* MAX initialized -> Wait for acquisition to start */
+    xEventGroupSetBits(xInitEvent, MAX_INIT);
     xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t max_start = esp_timer_get_time();
@@ -72,8 +90,16 @@ void task_max(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(MAX6675_CONVERSION_TIME_MS));
     }
 
-    ESP_ERROR_CHECK(max6675_delete(max1_handle));
-    ESP_ERROR_CHECK(max6675_delete(max2_handle));
+cleanup:
+    max6675_delete(max1_handle);
+    max6675_delete(max2_handle);
 
     vTaskDelete(NULL);
+
+setup_error: {
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+}
+
+    goto cleanup;
 }

@@ -2,7 +2,8 @@
 
 static const char *TAG_SYS = "SYS";
 
-#define FORMAT_MODE false
+#define FORMAT_MODE      false
+#define SETUP_TIMEOUT_MS 5000
 
 static esp_err_t setup_memory(void) {
     ESP_LOGI(TAG_SYS,
@@ -23,15 +24,8 @@ static esp_err_t setup_memory(void) {
     ads_data_g = (ads_data_t *)heap_caps_aligned_alloc(4, ADS_SAMPLES * sizeof(ads_data_t), MALLOC_CAP_SPIRAM);
     max_data_g = (max_data_t *)heap_caps_aligned_alloc(4, MAX_SAMPLES * sizeof(max_data_t), MALLOC_CAP_SPIRAM);
 
-    if (ads_data_g == NULL) {
-        ESP_LOGE(TAG_SYS, "Failed to allocate PSRAM for ADS data");
-
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (max_data_g == NULL) {
-        ESP_LOGE(TAG_SYS, "Failed to allocate PSRAM for MAX data");
-
+    if (ads_data_g == NULL || max_data_g == NULL) {
+        ESP_LOGE(TAG_SYS, "PSRAM allocation failed");
         return ESP_ERR_NO_MEM;
     }
 
@@ -71,7 +65,7 @@ static esp_err_t setup_peripherals(void) {
 
     err = spi_bus_initialize(host, &spi_bus_cfg, dma_chan);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Failed to initialize SPI bus");
+        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
         return err;
     }
 
@@ -107,27 +101,29 @@ static esp_err_t setup_peripherals(void) {
     /* Apply ISR */
     err = gpio_config(&drdy_conf);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Failed to apply DRDY config");
+        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
         return err;
     }
 
     err = gpio_config(&dio1_conf);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Failed to apply DIO1 config");
+        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
         return err;
     }
 
     err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Failed to start ISR");
+        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
         return err;
     }
 
-    if (xEventQueue == NULL)
+    if (xStatusQueue == NULL)
         return ESP_ERR_INVALID_ARG;
     if (xIgnitionQueue == NULL)
         return ESP_ERR_INVALID_ARG;
     if (xStatusEvent == NULL)
+        return ESP_ERR_INVALID_ARG;
+    if (xInitEvent == NULL)
         return ESP_ERR_INVALID_ARG;
 
     return err;
@@ -140,15 +136,19 @@ static esp_err_t setup_nvs(bool format_mode) {
         ESP_LOGE("NVS", "%s, erasing NVS partition...", esp_err_to_name(err));
         nvs_flash_erase();
         err = nvs_flash_init();
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG_SYS, "Setup NVS failed: %s", esp_err_to_name(err));
             return err;
+        }
     }
 
     nvs_handle_t nvs_handle;
     ESP_LOGI("NVS", "Opening Non-Volatile Storage (NVS) handle... ");
     err = nvs_open("storage", NVS_READWRITE, &nvs_handle);
-    if (err != ESP_OK)
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_SYS, "Setup NVS failed: %s", esp_err_to_name(err));
         return err;
+    }
 
     uint32_t sd_num  = 0;
     uint32_t lfs_num = 0;
@@ -170,49 +170,52 @@ static esp_err_t setup_nvs(bool format_mode) {
     return err;
 }
 
+/* Returns SETUP_OK or SETUP_FAILED */
 void task_setup(void *pvParameters) {
     esp_err_t err = ESP_OK;
 
     ESP_LOGI(TAG_SYS, "Allocating PSRAM");
     err = setup_memory();
     if (err != ESP_OK) {
-        status_event_t evt = EVT_SETUP_FAILED;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-
-        vTaskDelete(NULL);
+        goto setup_error;
     }
 
     ESP_LOGI(TAG_SYS, "GPIO configuration");
     err = setup_peripherals();
     if (err != ESP_OK) {
-        status_event_t evt = EVT_SETUP_FAILED;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-
-        vTaskDelete(NULL);
+        goto setup_error;
     }
 
     ESP_LOGI(TAG_SYS, "NVS flash init");
     err = setup_nvs(FORMAT_MODE);
     if (err != ESP_OK) {
-        status_event_t evt = EVT_SETUP_FAILED;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-
-        vTaskDelete(NULL);
+        goto setup_error;
     }
 
-    if (err == ESP_OK) {
+    EventBits_t init_bits =
+        xEventGroupWaitBits(xInitEvent, SETUP_INIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(SETUP_TIMEOUT_MS));
+
+    if ((init_bits & SETUP_INIT) == SETUP_INIT) {
         status_event_t evt = EVT_SETUP_OK;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-
-        vTaskDelete(NULL);
+        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    } else {
+        goto setup_error;
     }
+
+    vTaskDelete(NULL);
+
+setup_error: {
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+}
+    vTaskDelete(NULL);
 }
 
 void task_status(void *pvParameters) {
     status_event_t evt;
 
     while (true) {
-        if (xQueueReceive(xEventQueue, &evt, portMAX_DELAY) != pdTRUE)
+        if (xQueueReceive(xStatusQueue, &evt, portMAX_DELAY) != pdTRUE)
             continue;
 
         switch (evt) {
@@ -224,9 +227,9 @@ void task_status(void *pvParameters) {
             break;
 
         case EVT_SETUP_FAILED:
-            ESP_LOGI(TAG_SYS, "SETUP -> SETUP_FAIL");
+            ESP_LOGI(TAG_SYS, "SETUP -> FATAL_ERROR");
             xEventGroupClearBits(xStatusEvent, SETUP_START);
-            xEventGroupSetBits(xStatusEvent, SETUP_FAIL);
+            xEventGroupSetBits(xStatusEvent, FATAL_ERROR);
             break;
 
         case EVT_ARM:
@@ -247,7 +250,7 @@ void task_status(void *pvParameters) {
 
             if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
                 status_event_t evt = EVT_ACQUIRE_DONE;
-                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+                xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
             }
             break;
         }
@@ -258,7 +261,7 @@ void task_status(void *pvParameters) {
 
             if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
                 status_event_t evt = EVT_ACQUIRE_DONE;
-                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+                xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
             }
             break;
         }
@@ -297,17 +300,20 @@ void task_status(void *pvParameters) {
 
 void task_arm(void *pvParameters) {
     /* Wait for idle */
-    EventBits_t bits = xEventGroupWaitBits(xStatusEvent, SETUP_OK | SETUP_FAIL, pdFALSE, pdFALSE, portMAX_DELAY);
+    EventBits_t bits = xEventGroupWaitBits(xStatusEvent, SETUP_OK | FATAL_ERROR, pdFALSE, pdFALSE, portMAX_DELAY);
 
     /* Check before Arming */
+    if (bits & FATAL_ERROR) {
+        ESP_LOGW(TAG_SYS, "SYSTEM ERROR - ABORTING TEST");
+        vTaskDelete(xTaskIgnite);
+        vTaskDelete(xTaskStatus);
+        vTaskDelete(NULL);
+    }
+
     if (bits & SETUP_OK) {
         ESP_LOGW(TAG_SYS, "SYSTEM ARMED");
         status_event_t evt = EVT_ARM;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
-    }
-
-    if (bits & SETUP_FAIL) {
-        ESP_LOGW(TAG_SYS, "SYSTEM ERROR - ABORTING TEST");
+        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
     }
 
     vTaskDelete(NULL);

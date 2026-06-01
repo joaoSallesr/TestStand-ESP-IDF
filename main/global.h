@@ -9,13 +9,16 @@ extern sys_data_t     sys_data_g;
 extern file_counter_t file_counter_g;
 
 /* QUEUE HANDLE*/
-extern QueueHandle_t xEventQueue;
+extern QueueHandle_t xStatusQueue;
 extern QueueHandle_t xIgnitionQueue;
 
 /* EVENT HANDLE*/
 extern EventGroupHandle_t xStatusEvent;
+extern EventGroupHandle_t xInitEvent;
 
 /* TASK HANDLE */
+extern TaskHandle_t xTaskStatus;
+extern TaskHandle_t xTaskIgnite;
 extern TaskHandle_t xTaskAds;
 extern TaskHandle_t xTaskLora;
 
@@ -23,7 +26,7 @@ extern TaskHandle_t xTaskLora;
 void task_setup(void *pvParameters);
 void task_status(void *pvParameters);
 void task_arm(void *pvParameters);
-void task_ignition(void *pvParameters);
+void task_ignite(void *pvParameters);
 void task_ads(void *pvParameters);
 void task_max(void *pvParameters);
 void task_sd(void *pvParameters);

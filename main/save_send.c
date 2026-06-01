@@ -29,7 +29,7 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
 }
 
 void task_sd(void *pvParameters) {
-    esp_err_t     ret;
+    esp_err_t     err;
     sdmmc_card_t *card;
     uint8_t      *dma_buf = NULL;
 
@@ -61,15 +61,15 @@ void task_sd(void *pvParameters) {
 
     /* Mount filesystem */
     ESP_LOGI(TAG_SD, "Mounting filesystem");
-    ret = esp_vfs_fat_sdmmc_mount(SD_MOUNT, &host, &sd_cfg, &mount_cfg, &card);
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
+    err = esp_vfs_fat_sdmmc_mount(SD_MOUNT, &host, &sd_cfg, &mount_cfg, &card);
+    if (err != ESP_OK) {
+        if (err == ESP_FAIL) {
             ESP_LOGE(TAG_SD, "Failed to mount filesystem.");
         } else {
-            ESP_LOGE(TAG_SD, "Failed to initialize the card (%s).", esp_err_to_name(ret));
+            ESP_LOGE(TAG_SD, "Failed to initialize the card (%s).", esp_err_to_name(err));
         }
 
-        goto done;
+        goto error;
     }
     ESP_LOGI(TAG_SD, "Filesystem mounted");
     sdmmc_card_print_info(stdout, card);
@@ -78,10 +78,12 @@ void task_sd(void *pvParameters) {
     dma_buf = heap_caps_malloc(SD_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     if (dma_buf == NULL) {
         ESP_LOGE(TAG_SD, "Failed to allocate DMA buffer");
-        goto unmount;
+        err = ESP_ERR_NO_MEM;
+        goto error;
     }
 
-    /* Wait for SAVE_DATA */
+    /* SD initialized -> Wait for SAVE_DATA */
+    xEventGroupSetBits(xInitEvent, SD_INIT);
     xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     uint32_t ads_total = sys_data_g.ads_sample;
@@ -162,16 +164,22 @@ close:
 cleanup:
     free(dma_buf);
 
-unmount:
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
 
-done:
     EventBits_t bits = xEventGroupSetBits(xStatusEvent, SD_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         status_event_t evt = EVT_SAVE_DONE;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
     }
+
+    vTaskDelete(NULL);
+
+error:
+    ESP_LOGE(TAG_SD, "SD init failed: %s", esp_err_to_name(err));
+
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
 }
@@ -190,10 +198,18 @@ void task_lfs(void *pvParameters) {
     EventBits_t bits = xEventGroupSetBits(xStatusEvent, LFS_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         status_event_t evt = EVT_SAVE_DONE;
-        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
     }
 
     vTaskDelete(NULL);
+
+    // error:
+    // ESP_LOGE(TAG_LITTLEFS, "LFS init failed: %s", esp_err_to_name(err));
+
+    // status_event_t evt = EVT_SETUP_FAILED;
+    // xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+
+    // vTaskDelete(NULL);
 }
 
 void task_nvs(void *pvParameters) {
@@ -202,7 +218,7 @@ void task_nvs(void *pvParameters) {
     /* Wait for SAVE_DONE */
     xEventGroupWaitBits(xStatusEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(TAG_NVS, "Starting NVS file counter update");
-    ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &nvs_handle));
+    nvs_open("storage", NVS_READWRITE, &nvs_handle);
 
     /* Increment file counter */
     file_counter_g.sd_files += 1;
@@ -211,18 +227,20 @@ void task_nvs(void *pvParameters) {
     /* Update NVS */
     nvs_set_u32(nvs_handle, "sd_counter", file_counter_g.sd_files);
     nvs_set_u32(nvs_handle, "lfs_counter", file_counter_g.lfs_files);
-    ESP_ERROR_CHECK(nvs_commit(nvs_handle));
+    nvs_commit(nvs_handle);
 
     nvs_close(nvs_handle);
 
     ESP_LOGI(TAG_NVS, "NVS file counter updated");
 
     status_event_t evt = EVT_NVS_DONE;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
     vTaskDelete(NULL);
 }
 
-static void lora_init(sx126x_handle_t *lora_handle) {
+static esp_err_t lora_init(sx126x_handle_t *lora_handle) {
+    esp_err_t err = ESP_OK;
+
     /* SX1262 LoRa struct setup */
     sx126x_config_t lora_cfg = {
         .spi_host          = SPI_HOST,
@@ -245,20 +263,35 @@ static void lora_init(sx126x_handle_t *lora_handle) {
     };
 
     /* SX1262 LoRa initialization */
-    ESP_ERROR_CHECK(LoRaInit(&lora_cfg, lora_handle));
+    err = LoRaInit(&lora_cfg, lora_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_LORA, "LoRa init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     LoRaDebugPrint(*lora_handle, false);
-    ESP_ERROR_CHECK(LoRaBegin(*lora_handle));
+    err = LoRaBegin(*lora_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_LORA, "LoRa init failed: %s", esp_err_to_name(err));
+        return err;
+    }
+
     LoRaConfig(*lora_handle);
 
-    ESP_LOGI(TAG_LORA, "SX1262 initialized");
+    ESP_LOGI(TAG_LORA, "LoRa initialized");
+    return ESP_OK;
 }
 
 void task_lora(void *pvParameters) {
+    esp_err_t       err;
     sx126x_handle_t lora_handle;
     bool            ok;
     uint16_t        lost;
 
-    lora_init(&lora_handle);
+    err = lora_init(&lora_handle);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
 
     uint16_t irqMask  = SX126X_IRQ_TX_DONE;
     uint16_t dio1Mask = SX126X_IRQ_TX_DONE;
@@ -267,8 +300,14 @@ void task_lora(void *pvParameters) {
     // ADICIONAR BATCH PACKET ---------------------------------------------------------------
 
     /* SX1262 DIO1 ISR initialization */
-    ESP_ERROR_CHECK(gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL));
+    err = gpio_isr_handler_add(LORA_DIO1, dio1_isr_handler, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_LORA, "DIO1 ISR failed: %s", esp_err_to_name(err));
+        goto setup_error;
+    }
 
+    /* LoRa initialized -> Wait for acquisition to start */
+    xEventGroupSetBits(xInitEvent, LORA_INIT);
     xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
     // LORA RECEIVE
@@ -322,10 +361,18 @@ void task_lora(void *pvParameters) {
     ESP_LOGI(TAG_LORA, "SEND_DATA complete");
 
     status_event_t evt = EVT_SEND_DONE;
-    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
+cleanup:
     gpio_intr_disable(LORA_DIO1);
     gpio_isr_handler_remove(LORA_DIO1);
 
     vTaskDelete(NULL);
+
+setup_error: {
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+}
+
+    goto cleanup;
 }

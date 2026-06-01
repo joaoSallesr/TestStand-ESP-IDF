@@ -79,7 +79,7 @@
 /* STATUS FLAGS */
 #define SETUP_START BIT(0)
 #define SETUP_OK    BIT(1)
-#define SETUP_FAIL  BIT(2)
+#define FATAL_ERROR BIT(2)
 #define ARMED       BIT(3)
 #define ACQUIRE     BIT(4)
 #define ADS_DONE    BIT(5)
@@ -90,6 +90,15 @@
 #define NVS_EDIT    BIT(10)
 #define SEND_DATA   BIT(11)
 #define END_TEST    BIT(12)
+
+/* INIT FLAGS */
+#define ADS_INIT  BIT(0)
+#define MAX_INIT  BIT(1)
+#define SD_INIT   BIT(2)
+#define LFS_INIT  BIT(3)
+#define LORA_INIT BIT(4)
+
+#define SETUP_INIT (ADS_INIT | MAX_INIT | SD_INIT | LFS_INIT | LORA_INIT)
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {

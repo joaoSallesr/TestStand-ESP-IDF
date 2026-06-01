@@ -18,7 +18,7 @@ bool ads_check(int64_t ads_start) {
     if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_ADS_DONE;
-            xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+            xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_ADS, "ADS acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
@@ -28,7 +28,9 @@ bool ads_check(int64_t ads_start) {
     return false;
 }
 
-static void loadcell_init(ads1256_handle_t *loadcell_handle) {
+static esp_err_t loadcell_init(ads1256_handle_t *loadcell_handle) {
+    esp_err_t err;
+
     /* Load Cell struct setup */
     ads1256_config_t loadcell_cfg = {
         .spi_host        = SPI_HOST,
@@ -43,12 +45,19 @@ static void loadcell_init(ads1256_handle_t *loadcell_handle) {
     };
 
     /* Load Cell initialization */
-    ESP_ERROR_CHECK(ads1256_init(&loadcell_cfg, loadcell_handle));
+    err = ads1256_init(&loadcell_cfg, loadcell_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_ADS, "ADS1 init failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
     ESP_LOGI(TAG_ADS, "ADS1 initialized");
+    return ESP_OK;
 }
 
-static void transducer_init(ads1256_handle_t *trans_handle) {
+static esp_err_t transducer_init(ads1256_handle_t *trans_handle) {
+    esp_err_t err;
+
     /* Pressure Transducer struct setup */
     ads1256_config_t trans_cfg = {
         .spi_host        = SPI_HOST,
@@ -63,25 +72,44 @@ static void transducer_init(ads1256_handle_t *trans_handle) {
     };
 
     /* Pressure Transducer initialization */
-    ESP_ERROR_CHECK(ads1256_init(&trans_cfg, trans_handle));
+    err = ads1256_init(&trans_cfg, trans_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_ADS, "ADS2 init failed: %s", esp_err_to_name(err));
+        return err;
+    }
 
     ESP_LOGI(TAG_ADS, "ADS2 initialized");
+    return ESP_OK;
 }
 
 void task_ads(void *pvParameters) {
+    esp_err_t err;
+
     ads1256_handle_t loadcell_handle;
     ads1256_handle_t transducer_handle;
 
     int32_t current_thrust_raw;
     int32_t current_pressure_raw;
 
-    loadcell_init(&loadcell_handle);
-    transducer_init(&transducer_handle);
+    err = loadcell_init(&loadcell_handle);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
+
+    err = transducer_init(&transducer_handle);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
 
     /* ADS DRDY ISR initialization */
-    ESP_ERROR_CHECK(gpio_isr_handler_add(LOADCELL_DRDY, drdy_isr_handler, NULL));
+    err = gpio_isr_handler_add(LOADCELL_DRDY, drdy_isr_handler, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_ADS, "DRDY ISR failed: %s", esp_err_to_name(err));
+        goto setup_error;
+    }
 
-    /* Wait for acquisition to start */
+    /* ADS initialized -> Wait for acquisition to start */
+    xEventGroupSetBits(xInitEvent, ADS_INIT);
     xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t ads_start = esp_timer_get_time();
@@ -113,11 +141,18 @@ void task_ads(void *pvParameters) {
         sys_data_g.ads_sample++;
     }
 
-    ESP_ERROR_CHECK(ads1256_delete(loadcell_handle));
-    ESP_ERROR_CHECK(ads1256_delete(transducer_handle));
+cleanup:
+    ads1256_delete(loadcell_handle);
+    ads1256_delete(transducer_handle);
 
     gpio_intr_disable(LOADCELL_DRDY);
     gpio_isr_handler_remove(LOADCELL_DRDY);
 
     vTaskDelete(NULL);
+
+setup_error: {
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+}
+    goto cleanup;
 }
