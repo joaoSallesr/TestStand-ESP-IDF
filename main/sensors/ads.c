@@ -3,6 +3,7 @@
 static const char *TAG_ADS = "ADS";
 
 #define ADS_DRDY_TIMEOUT_MS 1
+#define ADS_INIT_TIMEOUT_MS 1000
 
 static void IRAM_ATTR drdy_isr_handler(void *arg) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
@@ -40,7 +41,7 @@ static esp_err_t loadcell_init(ads1256_handle_t *loadcell_handle) {
         .drate           = ADS1256_DRATE_1000SPS,
         .pos_channel     = ADS1256_MUX_AIN0,
         .neg_channel     = ADS1256_MUX_AIN1,
-        .drdy_timeout_ms = ADS_DRDY_TIMEOUT_MS,
+        .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
     };
 
@@ -67,7 +68,7 @@ static esp_err_t transducer_init(ads1256_handle_t *trans_handle) {
         .drate           = ADS1256_DRATE_1000SPS,
         .pos_channel     = ADS1256_MUX_AIN0,
         .neg_channel     = ADS1256_MUX_AIN1,
-        .drdy_timeout_ms = ADS_DRDY_TIMEOUT_MS,
+        .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
     };
 

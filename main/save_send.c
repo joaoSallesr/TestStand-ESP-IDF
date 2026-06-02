@@ -33,6 +33,8 @@ void task_sd(void *pvParameters) {
     sdmmc_card_t *card;
     uint8_t      *dma_buf = NULL;
 
+    bool fs_mounted = false;
+
     ESP_LOGI(TAG_SD, "Initializing SD card");
 
     /* SDIO host driver (4-bit mode enabled, max frequency set to 20MHz) */
@@ -72,6 +74,7 @@ void task_sd(void *pvParameters) {
         goto error;
     }
     ESP_LOGI(TAG_SD, "Filesystem mounted");
+    fs_mounted = true;
     sdmmc_card_print_info(stdout, card);
 
     /* Allocate DMA-capable internal buffer */
@@ -178,6 +181,11 @@ cleanup:
 error:
     ESP_LOGE(TAG_SD, "SD init failed: %s", esp_err_to_name(err));
 
+    if (fs_mounted) {
+        esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
+        ESP_LOGI(TAG_SD, "Card unmounted");
+    }
+
     status_event_t evt = EVT_SETUP_FAILED;
     xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
@@ -189,7 +197,8 @@ void task_lfs(void *pvParameters) {
     // TODO:
     // LFS INIT
 
-    /* Wait for SAVE_DATA */
+    /* LittleFS initialized -> Wait for SAVE_DATA */
+    xEventGroupSetBits(xInitEvent, LFS_INIT);
     xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     // TODO:
@@ -286,7 +295,7 @@ void task_lora(void *pvParameters) {
     esp_err_t       err;
     sx126x_handle_t lora_handle;
     bool            ok;
-    uint16_t        lost;
+    uint16_t        lost = 0;
 
     err = lora_init(&lora_handle);
     if (err != ESP_OK) {
@@ -326,15 +335,25 @@ void task_lora(void *pvParameters) {
 
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
+            lost++;
+            ReceiveMode(lora_handle);
+            continue;
         }
 
         uint16_t irq = GetIrqStatus(lora_handle);
+        if (irq & SX126X_IRQ_TX_DONE) {
+            ReceiveMode(lora_handle);
+        } else if (irq & SX126X_IRQ_TIMEOUT) {
+            ESP_LOGW(TAG_LORA, "TX timeout at sample %lu", i);
+            ReceiveMode(lora_handle);
+        }
         if (irq != 0) {
             ClearIrqStatus(lora_handle, irq);
         }
     }
     lost = GetPacketLost(lora_handle);
     ESP_LOGI(TAG_LORA, "Samples lost: %u", lost);
+    lost = 0;
 
     /* Send MAX samples */
     for (uint32_t i = 0; i < sys_data_g.max_sample; i++) {
@@ -347,9 +366,18 @@ void task_lora(void *pvParameters) {
 
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
+            lost++;
+            ReceiveMode(lora_handle);
+            continue;
         }
 
         uint16_t irq = GetIrqStatus(lora_handle);
+        if (irq & SX126X_IRQ_TX_DONE) {
+            ReceiveMode(lora_handle);
+        } else if (irq & SX126X_IRQ_TIMEOUT) {
+            ESP_LOGW(TAG_LORA, "TX timeout at sample %lu", i);
+            ReceiveMode(lora_handle);
+        }
         if (irq != 0) {
             ClearIrqStatus(lora_handle, irq);
         }

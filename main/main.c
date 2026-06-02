@@ -17,10 +17,9 @@ void app_main(void) {
     xInitEvent   = xEventGroupCreate();
 
     /* Setup Tasks */
-    xEventGroupSetBits(xStatusEvent, SETUP_START);
     xTaskCreatePinnedToCore(task_setup, "Setup", configMINIMAL_STACK_SIZE * 8, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(task_status, "Status", configMINIMAL_STACK_SIZE * 8, NULL, 10, &xTaskStatus, 0);
-    vTaskDelay(pdMS_TO_TICKS(150)); // Wait for peripherals to stabilize
+    xEventGroupWaitBits(xStatusEvent, TASK_INIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Peripherals Tasks */
     // Verificar parametros de criação das task

@@ -27,6 +27,8 @@
 #include <sdmmc_cmd.h>
 
 #include <freertos/FreeRTOS.h>
+#include <freertos/event_groups.h>
+#include <freertos/queue.h>
 #include <freertos/ringbuf.h>
 #include <freertos/task.h>
 
@@ -36,6 +38,8 @@
 
 #define LOW  0
 #define HIGH 1
+
+#define FORMAT_MODE false
 
 /* GPIO */
 #define BUZZER_GPIO   GPIO_NUM_4
@@ -69,7 +73,7 @@
 #define SPI_HOST SPI2_HOST
 #define DMA_CHAN SPI_DMA_CH_AUTO
 
-/* MEMORY CONFIG */
+/* TEST CONFIG */
 #define ADS_SAMPLES         7000
 #define ADS_ACQ_DURATION_MS 7000
 
@@ -77,7 +81,7 @@
 #define MAX_ACQ_DURATION_MS 20000
 
 /* STATUS FLAGS */
-#define SETUP_START BIT(0)
+#define TASK_INIT   BIT(0)
 #define SETUP_OK    BIT(1)
 #define FATAL_ERROR BIT(2)
 #define ARMED       BIT(3)
@@ -109,8 +113,8 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint32_t timestamp;        // 4 Bytes
-    int16_t  temperature1_raw; // 2 Bytes
-    int16_t  temperature2_raw; // 2 Bytes
+    uint16_t temperature1_raw; // 2 Bytes
+    uint16_t temperature2_raw; // 2 Bytes
 } max_data_t;                  // 8 Bytes
 
 /* SYSTEM STRUCTURES */
@@ -134,8 +138,9 @@ typedef struct __attribute__((packed)) {
 
 /* EVENT STRUCTURES */
 typedef enum {
-    EVT_SETUP_OK,
-    EVT_SETUP_FAILED,
+    EVT_INIT_READY,    // task_status finished peripheral setup
+    EVT_SETUP_OK,      // system tasks initialized correctly
+    EVT_SETUP_FAILED,  // system initialization failed
     EVT_ARM,           // system armed
     EVT_IGNITION_DONE, // ignition succeeded
     EVT_ADS_DONE,      // task_ads finished

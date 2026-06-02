@@ -2,7 +2,6 @@
 
 static const char *TAG_SYS = "SYS";
 
-#define FORMAT_MODE      false
 #define SETUP_TIMEOUT_MS 5000
 
 static esp_err_t setup_memory(void) {
@@ -220,15 +219,20 @@ void task_status(void *pvParameters) {
 
         switch (evt) {
 
+        case EVT_INIT_READY:
+            ESP_LOGI(TAG_SYS, "TASK_INIT");
+            xEventGroupSetBits(xStatusEvent, TASK_INIT);
+            break;
+
         case EVT_SETUP_OK:
-            ESP_LOGI(TAG_SYS, "SETUP_START -> SETUP_OK");
-            xEventGroupClearBits(xStatusEvent, SETUP_START);
+            ESP_LOGI(TAG_SYS, "TASK_INIT -> SETUP_OK");
+            xEventGroupClearBits(xStatusEvent, TASK_INIT);
             xEventGroupSetBits(xStatusEvent, SETUP_OK);
             break;
 
         case EVT_SETUP_FAILED:
-            ESP_LOGI(TAG_SYS, "SETUP -> FATAL_ERROR");
-            xEventGroupClearBits(xStatusEvent, SETUP_START);
+            ESP_LOGI(TAG_SYS, "TASK_INIT -> FATAL_ERROR");
+            xEventGroupClearBits(xStatusEvent, TASK_INIT);
             xEventGroupSetBits(xStatusEvent, FATAL_ERROR);
             break;
 
