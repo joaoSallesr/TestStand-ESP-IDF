@@ -40,8 +40,6 @@
 #define LOW  0
 #define HIGH 1
 
-#define FORMAT_MODE false
-
 /* GPIO */
 #define BUZZER_GPIO   GPIO_NUM_4
 #define IGNITION_GPIO GPIO_NUM_5 // IGNITION COMMAND OUTPUT
@@ -74,7 +72,10 @@
 #define SPI_HOST SPI2_HOST
 #define DMA_CHAN SPI_DMA_CH_AUTO
 
-/* TEST CONFIG */
+/* IGNITE CONFIG */
+#define CMD_IGNITION 0xAA
+
+/* ACQUIRE CONFIG */
 #define ADS_SAMPLES         7000
 #define ADS_ACQ_DURATION_MS 7000
 
@@ -153,5 +154,7 @@ typedef enum {
 } status_event_t;
 
 typedef enum {
-    EVT_IGNITION_START, // lora sends ignition cmd
+    EVT_IGNITION_START,   // lora sends ignition cmd
+    EVT_IGNITION_SUCCESS, // stop ignition detection
+    EVT_IGNITION_FAILED,  // continue ignition detection
 } ignition_event_t;

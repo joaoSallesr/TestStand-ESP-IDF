@@ -3,6 +3,7 @@
 static const char *TAG_SYS = "SYS";
 
 #define SETUP_TIMEOUT_MS 5000
+#define FORMAT_MODE      false
 
 static esp_err_t setup_memory(void) {
     ESP_LOGI(TAG_SYS,

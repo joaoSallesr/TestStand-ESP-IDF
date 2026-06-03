@@ -5,7 +5,7 @@ static const char *TAG_LORA = "LoRa";
 /* LORA CONFIG */
 #define LORA_FREQUENCY        915000000 // Hz
 #define LORA_SPREADING_FACTOR 5
-#define LORA_BANDWIDTH        SX126X_LORA_BW_125_0
+#define LORA_BANDWIDTH        SX126X_LORA_BW_500_0
 #define LORA_CODING_RATE      SX126X_LORA_CR_4_5
 #define LORA_DIO1_TIMEOUT_MS  1000
 
@@ -14,6 +14,15 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
     vTaskNotifyGiveFromISR(xTaskLora, &xHigherPriorityTaskWoken);
     if (xHigherPriorityTaskWoken)
         portYIELD_FROM_ISR();
+}
+
+void LoRaError(int error) {
+    ESP_LOGE(TAG_LORA, "Fatal LoRa error: %d", error);
+    gpio_intr_disable(LORA_DIO1);
+    gpio_isr_handler_remove(LORA_DIO1);
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    vTaskDelete(NULL);
 }
 
 static esp_err_t lora_init(sx126x_handle_t *lora_handle) {
@@ -48,10 +57,10 @@ static esp_err_t lora_init(sx126x_handle_t *lora_handle) {
     }
 
     LoRaDebugPrint(*lora_handle, false);
-    err = LoRaBegin(*lora_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG_LORA, "LoRa init failed: %s", esp_err_to_name(err));
-        return err;
+    int16_t lora_ret = LoRaBegin(*lora_handle);
+    if (lora_ret != ERR_NONE) {
+        ESP_LOGE(TAG_LORA, "LoRa begin failed: %d", lora_ret);
+        return ESP_FAIL;
     }
 
     LoRaConfig(*lora_handle);
@@ -71,10 +80,6 @@ void task_lora(void *pvParameters) {
         goto setup_error;
     }
 
-    uint16_t irqMask  = SX126X_IRQ_TX_DONE;
-    uint16_t dio1Mask = SX126X_IRQ_TX_DONE;
-    SetDioIrqParams(lora_handle, irqMask, dio1Mask, 0, 0);
-
     // ADICIONAR BATCH PACKET ---------------------------------------------------------------
 
     /* SX1262 DIO1 ISR initialization */
@@ -84,18 +89,30 @@ void task_lora(void *pvParameters) {
         goto setup_error;
     }
 
+    /* IRQ parameters */
+    uint16_t irqMask  = SX126X_IRQ_RX_DONE | SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT;
+    uint16_t dio1Mask = SX126X_IRQ_TX_DONE;
+    SetDioIrqParams(lora_handle, irqMask, dio1Mask, 0, 0);
+
     /* LoRa initialized -> Wait for acquisition to start */
     xEventGroupSetBits(xInitEvent, LORA_INIT);
     xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    // LORA RECEIVE
-    // EVENT IGNIÇÃO
+    uint8_t rx_buf[16];
+    while (true) {
+        uint8_t len = LoRaReceive(lora_handle, rx_buf, sizeof(rx_buf));
+        if (len > 0 && rx_buf[0] == CMD_IGNITION) {
+            ignition_event_t ign_evt = EVT_IGNITION_START;
+            xQueueSend(xIgnitionQueue, &ign_evt, portMAX_DELAY);
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 
     xEventGroupWaitBits(xStatusEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Send ADS samples */
     for (uint32_t i = 0; i < sys_data_g.ads_sample; i++) {
-        ClearIrqStatus(lora_handle, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT);
         ok = LoRaSend(lora_handle, (uint8_t *)&ads_data_g[i], sizeof(ads_data_t), SX126x_TXMODE_ASYNC);
         if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
@@ -105,7 +122,9 @@ void task_lora(void *pvParameters) {
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
             lost++;
-            ReceiveMode(lora_handle);
+            ClearIrqStatus(lora_handle, SX126X_IRQ_ALL);
+            lora_handle->txActive = false;
+            SetRx(lora_handle, 0xFFFFFF);
             continue;
         }
 
@@ -120,13 +139,11 @@ void task_lora(void *pvParameters) {
             ClearIrqStatus(lora_handle, irq);
         }
     }
-    lost = GetPacketLost(lora_handle);
-    ESP_LOGI(TAG_LORA, "Samples lost: %u", lost);
-    lost = 0;
+    uint16_t ads_lost = GetPacketLost(lora_handle);
+    ESP_LOGI(TAG_LORA, "ADS samples lost: %u", ads_lost);
 
     /* Send MAX samples */
     for (uint32_t i = 0; i < sys_data_g.max_sample; i++) {
-        ClearIrqStatus(lora_handle, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT);
         ok = LoRaSend(lora_handle, (uint8_t *)&max_data_g[i], sizeof(max_data_t), SX126x_TXMODE_ASYNC);
         if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
@@ -136,7 +153,9 @@ void task_lora(void *pvParameters) {
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LORA_DIO1_TIMEOUT_MS)) == 0) {
             ESP_LOGW(TAG_LORA, "TX notify timeout at sample %lu", i);
             lost++;
-            ReceiveMode(lora_handle);
+            ClearIrqStatus(lora_handle, SX126X_IRQ_ALL);
+            lora_handle->txActive = false;
+            SetRx(lora_handle, 0xFFFFFF);
             continue;
         }
 
@@ -152,8 +171,8 @@ void task_lora(void *pvParameters) {
         }
     }
 
-    lost = GetPacketLost(lora_handle);
-    ESP_LOGI(TAG_LORA, "Samples lost: %u", lost);
+    uint16_t max_lost = GetPacketLost(lora_handle) - ads_lost;
+    ESP_LOGI(TAG_LORA, "MAX samples lost: %u", max_lost);
 
     ESP_LOGI(TAG_LORA, "SEND_DATA complete");
 
@@ -167,6 +186,8 @@ cleanup:
     vTaskDelete(NULL);
 
 setup_error: {
+    ESP_LOGE(TAG_LORA, "LoRa init failed: %s", esp_err_to_name(err));
+
     status_event_t evt = EVT_SETUP_FAILED;
     xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 }

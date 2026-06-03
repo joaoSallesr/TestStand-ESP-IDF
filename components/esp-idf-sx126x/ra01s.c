@@ -20,7 +20,7 @@ esp_err_t LoRaInit(sx126x_config_t *sx126x_config, sx126x_handle_t *sx126x_handl
 
     /* validate memory allocation */
     sx126x_handle_t out_handle = (sx126x_handle_t)calloc(1, sizeof(*out_handle));
-    ESP_RETURN_ON_FALSE(out_handle, ESP_ERR_NO_MEM, TAG, "No memory for ADS1256 device");
+    ESP_RETURN_ON_FALSE(out_handle, ESP_ERR_NO_MEM, TAG, "No memory for SX126x device");
 
     /* copy device config to out_handle */
     out_handle->dev_config = *sx126x_config;
@@ -887,6 +887,6 @@ void ReadCommand(sx126x_handle_t handle, uint8_t cmd, uint8_t *data, uint8_t num
         ESP_LOGE(TAG, "ReadCommand malloc fail");
     }
 
-    vTaskDelay(1);
+    esp_rom_delay_us(10);
     WaitForIdle(handle, BUSY_WAIT, "end ReadCommand", false);
 }
