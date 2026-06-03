@@ -71,18 +71,30 @@ void task_sd(void *pvParameters) {
             ESP_LOGE(TAG_SD, "Failed to initialize the card (%s).", esp_err_to_name(err));
         }
 
-        goto error;
+        goto setup_error;
     }
+
     ESP_LOGI(TAG_SD, "Filesystem mounted");
-    fs_mounted = true;
     sdmmc_card_print_info(stdout, card);
+    fs_mounted = true;
+
+    /* SD format mode */
+    if (file_counter_g.format == true) {
+        ESP_LOGW(TAG_SD, "Format mode enabled, formatting SD card");
+        err = esp_vfs_fat_sdcard_format(SD_MOUNT, card);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG_SD, "Failed to format SD card: %s", esp_err_to_name(err));
+            goto setup_error;
+        }
+        goto format_device;
+    }
 
     /* Allocate DMA-capable internal buffer */
     dma_buf = heap_caps_malloc(SD_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     if (dma_buf == NULL) {
         ESP_LOGE(TAG_SD, "Failed to allocate DMA buffer");
         err = ESP_ERR_NO_MEM;
-        goto error;
+        goto setup_error;
     }
 
     /* SD initialized -> Wait for SAVE_DATA */
@@ -178,7 +190,7 @@ cleanup:
 
     vTaskDelete(NULL);
 
-error:
+setup_error:
     ESP_LOGE(TAG_SD, "SD init failed: %s", esp_err_to_name(err));
 
     if (fs_mounted) {
@@ -190,22 +202,44 @@ error:
     xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
+
+format_device:
+    ESP_LOGW(TAG_SD, "SD card formatted");
+
+    esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
+    ESP_LOGI(TAG_SD, "Card unmounted");
+
+    vTaskDelete(NULL);
 }
 
 void task_lfs(void *pvParameters) {
     esp_err_t err;
 
-    // Settings for initializing LittleFS
-    /*esp_vfs_littlefs_conf_t littlefs_config = {
+    /* Settings for initializing LittleFS */
+    esp_vfs_littlefs_conf_t littlefs_cfg = {
         .base_path              = "/littlefs",
         .partition_label        = "littlefs",
         .format_if_mount_failed = true,
         .dont_mount             = false,
     };
 
+    /* LittleFS initialization */
     ESP_LOGI(TAG_LITTLEFS, "Initializing LittleFS");
+    err = esp_vfs_littlefs_register(&littlefs_cfg);
+    if (err != ESP_OK) {
+        goto setup_error;
+    }
 
-    err = esp_vfs_littlefs_register(&littlefs_config);*/
+    /* LittleFS format mode */
+    if (file_counter_g.format == true) {
+        ESP_LOGW(TAG_LITTLEFS, "Format mode enabled, formatting LittleFS");
+        err = esp_littlefs_format(littlefs_cfg.partition_label);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG_LITTLEFS, "Failed to format LittleFS: %s", esp_err_to_name(err));
+            goto setup_error;
+        }
+        goto format_device;
+    }
 
     // TODO:
     // LFS INIT
@@ -225,13 +259,17 @@ void task_lfs(void *pvParameters) {
 
     vTaskDelete(NULL);
 
-    // error:
-    // ESP_LOGE(TAG_LITTLEFS, "LFS init failed: %s", esp_err_to_name(err));
+setup_error:
+    ESP_LOGE(TAG_LITTLEFS, "LFS init failed: %s", esp_err_to_name(err));
 
-    // status_event_t evt = EVT_SETUP_FAILED;
-    // xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    status_event_t evt = EVT_SETUP_FAILED;
+    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
-    // vTaskDelete(NULL);
+    vTaskDelete(NULL);
+
+format_device:
+    ESP_LOGW(TAG_LITTLEFS, "LittleFS formatted");
+    vTaskDelete(NULL);
 }
 
 void task_nvs(void *pvParameters) {
