@@ -4,7 +4,8 @@ idf_component_register(SRCS main.c
                             ignite.c
                             sensors/ads.c
                             sensors/max.c
-                            save_send.c
+                            save.c
+                            send.c
                         INCLUDE_DIRS "."
                         REQUIRES
                             esp_ads1256
