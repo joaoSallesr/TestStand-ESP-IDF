@@ -257,7 +257,7 @@ void task_lfs(void *pvParameters) {
     /* Allocate DMA-capable internal buffer */
     lfs_dma_buf = heap_caps_malloc(LFS_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     if (lfs_dma_buf == NULL) {
-        ESP_LOGE(TAG_SD, "Failed to allocate DMA buffer");
+        ESP_LOGE(TAG_LFS, "Failed to allocate DMA buffer");
         err = ESP_ERR_NO_MEM;
         goto setup_error;
     }
@@ -268,7 +268,7 @@ void task_lfs(void *pvParameters) {
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
-    ESP_LOGI(TAG_SD, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
+    ESP_LOGI(TAG_LFS, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
 
     /* Create log file */
     char log_name[FILENAME_LENGTH];
