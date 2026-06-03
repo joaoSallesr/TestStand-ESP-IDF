@@ -1,9 +1,9 @@
 #include "global.h"
 
-static const char *TAG_SD       = "SD";
-static const char *TAG_LITTLEFS = "LittleFS";
-static const char *TAG_NVS      = "NVS";
-static const char *TAG_LORA     = "LoRa";
+static const char *TAG_SD   = "SD";
+static const char *TAG_LFS  = "LittleFS";
+static const char *TAG_NVS  = "NVS";
+static const char *TAG_LORA = "LoRa";
 
 /* SD & LITTLEFS CONFIG */
 #define SD_MAX_FILES    5
@@ -11,7 +11,8 @@ static const char *TAG_LORA     = "LoRa";
 #define SD_BUFFER_SIZE  32 * 1024
 #define SD_UNIT_SIZE    32 * 1024
 #define LFS_MAX_FILES   32
-#define LFS_BUFFER_SIZE 512
+#define LFS_BUFFER_SIZE 32 * 1024
+#define LFS_MAX_FLASH   0.9 // Maximum percentage of flash to be used by littlefs
 #define FILENAME_LENGTH 32
 
 /* LORA CONFIG */
@@ -31,9 +32,9 @@ static void IRAM_ATTR dio1_isr_handler(void *arg) {
 void task_sd(void *pvParameters) {
     esp_err_t     err;
     sdmmc_card_t *card;
-    uint8_t      *dma_buf = NULL;
+    uint8_t      *sd_dma_buf = NULL;
 
-    bool fs_mounted = false;
+    bool sd_mounted = false;
 
     ESP_LOGI(TAG_SD, "Initializing SD card");
 
@@ -65,18 +66,13 @@ void task_sd(void *pvParameters) {
     ESP_LOGI(TAG_SD, "Mounting filesystem");
     err = esp_vfs_fat_sdmmc_mount(SD_MOUNT, &host, &sd_cfg, &mount_cfg, &card);
     if (err != ESP_OK) {
-        if (err == ESP_FAIL) {
-            ESP_LOGE(TAG_SD, "Failed to mount filesystem.");
-        } else {
-            ESP_LOGE(TAG_SD, "Failed to initialize the card (%s).", esp_err_to_name(err));
-        }
-
+        ESP_LOGE(TAG_SD, "Failed to mount SD card");
         goto setup_error;
     }
 
     ESP_LOGI(TAG_SD, "Filesystem mounted");
     sdmmc_card_print_info(stdout, card);
-    fs_mounted = true;
+    sd_mounted = true;
 
     /* SD format mode */
     if (file_counter_g.format == true) {
@@ -90,8 +86,8 @@ void task_sd(void *pvParameters) {
     }
 
     /* Allocate DMA-capable internal buffer */
-    dma_buf = heap_caps_malloc(SD_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    if (dma_buf == NULL) {
+    sd_dma_buf = heap_caps_malloc(SD_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (sd_dma_buf == NULL) {
         ESP_LOGE(TAG_SD, "Failed to allocate DMA buffer");
         err = ESP_ERR_NO_MEM;
         goto setup_error;
@@ -117,14 +113,14 @@ void task_sd(void *pvParameters) {
     }
 
     /* Write header */
-    file_header_t hdr = {
+    file_header_t sd_header = {
         .name_check  = 0xABCD1234,
         .ads_samples = ads_total,
         .max_samples = max_total,
         .timestamp   = (uint32_t)esp_timer_get_time(),
     };
 
-    if (fwrite(&hdr, sizeof(file_header_t), 1, f) != 1) {
+    if (fwrite(&sd_header, sizeof(file_header_t), 1, f) != 1) {
         ESP_LOGE(TAG_SD, "Failed to write header");
         goto close;
     }
@@ -139,14 +135,15 @@ void task_sd(void *pvParameters) {
             uint32_t batch = ((ads_total - written) < chunk ? (ads_total - written) : chunk); // sets chunk size
             size_t   bytes = batch * sample_size;
 
-            memcpy(dma_buf, &ads_data_g[written], bytes);
+            memcpy(sd_dma_buf, &ads_data_g[written], bytes);
 
-            if (fwrite(dma_buf, sample_size, batch, f) != batch) {
+            if (fwrite(sd_dma_buf, sample_size, batch, f) != batch) {
                 ESP_LOGE(TAG_SD, "ADS write error at sample %lu", written);
                 goto close;
             }
             written += batch;
         }
+
         ESP_LOGI(TAG_SD, "ADS: %lu samples written (%lu bytes)", written, written * sample_size);
     }
 
@@ -160,24 +157,26 @@ void task_sd(void *pvParameters) {
             uint32_t batch = ((max_total - written) < chunk ? (max_total - written) : chunk); // sets chunk size
             size_t   bytes = batch * sample_size;
 
-            memcpy(dma_buf, &max_data_g[written], bytes);
+            memcpy(sd_dma_buf, &max_data_g[written], bytes);
 
-            if (fwrite(dma_buf, sample_size, batch, f) != batch) {
+            if (fwrite(sd_dma_buf, sample_size, batch, f) != batch) {
                 ESP_LOGE(TAG_SD, "MAX write error at sample %lu", written);
                 goto close;
             }
             written += batch;
         }
+
         ESP_LOGI(TAG_SD, "MAX: %lu samples written (%lu bytes)", written, written * sample_size);
     }
 
-    ESP_LOGI(TAG_SD, "SAVE_DATA complete");
+    ESP_LOGI(TAG_SD, "SD card data saving completed");
 
 close:
     fclose(f);
+    vTaskDelay(pdMS_TO_TICKS(20));
 
 cleanup:
-    free(dma_buf);
+    free(sd_dma_buf);
 
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
@@ -193,7 +192,7 @@ cleanup:
 setup_error:
     ESP_LOGE(TAG_SD, "SD init failed: %s", esp_err_to_name(err));
 
-    if (fs_mounted) {
+    if (sd_mounted) {
         esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
         ESP_LOGI(TAG_SD, "Card unmounted");
     }
@@ -214,6 +213,9 @@ format_device:
 
 void task_lfs(void *pvParameters) {
     esp_err_t err;
+    uint8_t  *lfs_dma_buf = NULL;
+
+    bool lfs_mounted = false;
 
     /* Settings for initializing LittleFS */
     esp_vfs_littlefs_conf_t littlefs_cfg = {
@@ -224,32 +226,130 @@ void task_lfs(void *pvParameters) {
     };
 
     /* LittleFS initialization */
-    ESP_LOGI(TAG_LITTLEFS, "Initializing LittleFS");
+    ESP_LOGI(TAG_LFS, "Initializing LittleFS");
     err = esp_vfs_littlefs_register(&littlefs_cfg);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG_LFS, "Failed to mount LittleFS");
         goto setup_error;
     }
 
+    size_t lfs_size = 0;
+    size_t lfs_used = 0;
+    ESP_LOGI(TAG_LFS, "Filesystem mounted");
+    err = esp_littlefs_info(littlefs_cfg.partition_label, &lfs_size, &lfs_used);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_LFS, "Failed to get LittleFS partition information");
+        goto setup_error;
+    }
+    lfs_mounted = true;
+
     /* LittleFS format mode */
     if (file_counter_g.format == true) {
-        ESP_LOGW(TAG_LITTLEFS, "Format mode enabled, formatting LittleFS");
+        ESP_LOGW(TAG_LFS, "Format mode enabled, formatting LittleFS");
         err = esp_littlefs_format(littlefs_cfg.partition_label);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG_LITTLEFS, "Failed to format LittleFS: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG_LFS, "Failed to format LittleFS: %s", esp_err_to_name(err));
             goto setup_error;
         }
         goto format_device;
     }
 
-    // TODO:
-    // LFS INIT
+    /* Allocate DMA-capable internal buffer */
+    lfs_dma_buf = heap_caps_malloc(LFS_BUFFER_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (lfs_dma_buf == NULL) {
+        ESP_LOGE(TAG_SD, "Failed to allocate DMA buffer");
+        err = ESP_ERR_NO_MEM;
+        goto setup_error;
+    }
 
     /* LittleFS initialized -> Wait for SAVE_DATA */
     xEventGroupSetBits(xInitEvent, LFS_INIT);
     xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
-    // TODO:
-    // LFS SAVE
+    uint32_t ads_total = sys_data_g.ads_sample;
+    uint32_t max_total = sys_data_g.max_sample;
+    ESP_LOGI(TAG_SD, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
+
+    /* Create log file */
+    char log_name[FILENAME_LENGTH];
+    snprintf(log_name, FILENAME_LENGTH, "%s/flight%ld.bin", littlefs_cfg.base_path, file_counter_g.lfs_files);
+    ESP_LOGI(TAG_LFS, "Created file %s", log_name);
+
+    FILE *f = fopen(log_name, "wb");
+    if (!f) {
+        ESP_LOGE(TAG_LFS, "Failed to open file for writing");
+        goto cleanup;
+    }
+
+    /* Write header */
+    file_header_t lfs_header = {
+        .name_check  = 0xABCD5678,
+        .ads_samples = ads_total,
+        .max_samples = max_total,
+        .timestamp   = (uint32_t)esp_timer_get_time(),
+    };
+
+    if (fwrite(&lfs_header, sizeof(file_header_t), 1, f) != 1) {
+        ESP_LOGE(TAG_LFS, "Failed to write header");
+        goto close;
+    }
+
+    /* Write ADS data */
+    {
+        const size_t   sample_size = sizeof(ads_data_t);
+        const uint32_t chunk       = LFS_BUFFER_SIZE / sample_size;
+        uint32_t       written     = 0;
+
+        while (written < ads_total) {
+            uint32_t batch = ((ads_total - written) < chunk ? (ads_total - written) : chunk); // sets chunk size
+            size_t   bytes = batch * sample_size;
+
+            memcpy(lfs_dma_buf, &ads_data_g[written], bytes);
+
+            if (fwrite(lfs_dma_buf, sample_size, batch, f) != batch) {
+                ESP_LOGE(TAG_LFS, "ADS write error at sample %lu", written);
+                goto close;
+            }
+
+            written += batch;
+        }
+
+        ESP_LOGI(TAG_LFS, "ADS: %lu samples written (%lu bytes)", written, written * sample_size);
+    }
+
+    /* Write MAX data */
+    {
+        const size_t   sample_size = sizeof(max_data_t);
+        const uint32_t chunk       = LFS_BUFFER_SIZE / sample_size;
+        uint32_t       written     = 0;
+
+        while (written < max_total) {
+            uint32_t batch = ((max_total - written) < chunk ? (max_total - written) : chunk); // sets chunk size
+            size_t   bytes = batch * sample_size;
+
+            memcpy(lfs_dma_buf, &max_data_g[written], bytes);
+
+            if (fwrite(lfs_dma_buf, sample_size, batch, f) != batch) {
+                ESP_LOGE(TAG_LFS, "MAX write error at sample %lu", written);
+                goto close;
+            }
+            written += batch;
+        }
+
+        ESP_LOGI(TAG_LFS, "MAX: %lu samples written (%lu bytes)", written, written * sample_size);
+    }
+
+    ESP_LOGI(TAG_LFS, "LFS data saving completed");
+
+close:
+    fclose(f);
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+cleanup:
+    free(lfs_dma_buf);
+
+    esp_vfs_littlefs_unregister(littlefs_cfg.partition_label);
+    ESP_LOGI(TAG_LFS, "LittleFS unmounted");
 
     EventBits_t bits = xEventGroupSetBits(xStatusEvent, LFS_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
@@ -260,7 +360,12 @@ void task_lfs(void *pvParameters) {
     vTaskDelete(NULL);
 
 setup_error:
-    ESP_LOGE(TAG_LITTLEFS, "LFS init failed: %s", esp_err_to_name(err));
+    ESP_LOGE(TAG_LFS, "LFS init failed: %s", esp_err_to_name(err));
+
+    if (lfs_mounted) {
+        esp_vfs_littlefs_unregister(littlefs_cfg.partition_label);
+        ESP_LOGI(TAG_LFS, "LittleFS unmounted");
+    }
 
     status_event_t evt = EVT_SETUP_FAILED;
     xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
@@ -268,7 +373,7 @@ setup_error:
     vTaskDelete(NULL);
 
 format_device:
-    ESP_LOGW(TAG_LITTLEFS, "LittleFS formatted");
+    ESP_LOGW(TAG_LFS, "LittleFS formatted");
     vTaskDelete(NULL);
 }
 
