@@ -5,7 +5,7 @@ static const char *TAG_LITTLEFS = "LittleFS";
 static const char *TAG_NVS      = "NVS";
 static const char *TAG_LORA     = "LoRa";
 
-// SD & LITTLEFS CONFIG
+/* SD & LITTLEFS CONFIG */
 #define SD_MAX_FILES    5
 #define SD_MOUNT        "/sdcard"
 #define SD_BUFFER_SIZE  32 * 1024
@@ -14,7 +14,7 @@ static const char *TAG_LORA     = "LoRa";
 #define LFS_BUFFER_SIZE 512
 #define FILENAME_LENGTH 32
 
-// LORA CONFIG
+/* LORA CONFIG */
 #define LORA_FREQUENCY        915000000 // Hz
 #define LORA_SPREADING_FACTOR 5
 #define LORA_BANDWIDTH        SX126X_LORA_BW_125_0
@@ -193,6 +193,19 @@ error:
 }
 
 void task_lfs(void *pvParameters) {
+    esp_err_t err;
+
+    // Settings for initializing LittleFS
+    /*esp_vfs_littlefs_conf_t littlefs_config = {
+        .base_path              = "/littlefs",
+        .partition_label        = "littlefs",
+        .format_if_mount_failed = true,
+        .dont_mount             = false,
+    };
+
+    ESP_LOGI(TAG_LITTLEFS, "Initializing LittleFS");
+
+    err = esp_vfs_littlefs_register(&littlefs_config);*/
 
     // TODO:
     // LFS INIT

@@ -33,6 +33,7 @@
 #include <freertos/task.h>
 
 #include "esp_ads1256.h"
+#include "esp_littlefs.h"
 #include "max6675.h"
 #include "ra01s.h"
 
