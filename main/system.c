@@ -80,6 +80,16 @@ static esp_err_t setup_peripherals(void) {
     gpio_set_direction(IGNITION_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(IGNITION_GPIO, LOW);
 
+    /* Set to LOW:delay:HIGH before asking for data */
+    gpio_reset_pin(LOADCELL_SYNC);
+    gpio_set_direction(LOADCELL_SYNC, GPIO_MODE_OUTPUT);
+    gpio_set_level(LOADCELL_SYNC, HIGH);
+
+    /* Set to LOW:delay:HIGH before asking for data */
+    gpio_reset_pin(TRANS_SYNC);
+    gpio_set_direction(TRANS_SYNC, GPIO_MODE_OUTPUT);
+    gpio_set_level(TRANS_SYNC, HIGH);
+
     /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
         .pin_bit_mask = (1ULL << LOADCELL_DRDY),

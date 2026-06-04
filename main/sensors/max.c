@@ -72,8 +72,13 @@ void task_max(void *pvParameters) {
             break;
 
         /* MAX readings */
-        max6675_read(max1_handle, &current_temperature1_raw);
-        max6675_read(max2_handle, &current_temperature2_raw);
+        err = max6675_read(max1_handle, &current_temperature1_raw);
+        if (err != ESP_OK)
+            sys_data_g.max_lost++;
+
+        err = max6675_read(max2_handle, &current_temperature2_raw);
+        if (err != ESP_OK)
+            sys_data_g.max_lost++;
 
         /* Create MAX sample */
         max_data_t sample = {
@@ -89,6 +94,8 @@ void task_max(void *pvParameters) {
         /* CS HIGH = measure - conversion time (CT_MS) -> CS LOW = output */
         vTaskDelay(pdMS_TO_TICKS(MAX6675_CONVERSION_TIME_MS));
     }
+
+    ESP_LOGE(TAG_MAX, "Lost Samples/Read Samples : %d/%d", sys_data_g.max_lost, sys_data_g.max_sample);
 
 cleanup:
     max6675_delete(max1_handle);

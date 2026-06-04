@@ -84,6 +84,8 @@ void task_sd(void *pvParameters) {
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
+    uint32_t ads_lost  = sys_data_g.ads_lost;
+    uint32_t max_lost  = sys_data_g.max_lost;
     ESP_LOGI(TAG_SD, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
 
     /* Create log file */
@@ -102,6 +104,8 @@ void task_sd(void *pvParameters) {
         .name_check  = 0xABCD1234,
         .ads_samples = ads_total,
         .max_samples = max_total,
+        .ads_lost    = ads_lost,
+        .max_lost    = max_lost,
         .timestamp   = (uint32_t)esp_timer_get_time(),
     };
 
@@ -253,6 +257,8 @@ void task_lfs(void *pvParameters) {
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
+    uint32_t ads_lost  = sys_data_g.ads_lost;
+    uint32_t max_lost  = sys_data_g.max_lost;
     ESP_LOGI(TAG_LFS, "Saving %lu ADS samples, %lu MAX samples", ads_total, max_total);
 
     /* Create log file */
@@ -271,6 +277,8 @@ void task_lfs(void *pvParameters) {
         .name_check  = 0xABCD5678,
         .ads_samples = ads_total,
         .max_samples = max_total,
+        .ads_lost    = ads_lost,
+        .max_lost    = max_lost,
         .timestamp   = (uint32_t)esp_timer_get_time(),
     };
 

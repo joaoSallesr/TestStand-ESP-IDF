@@ -120,15 +120,24 @@ void task_ads(void *pvParameters) {
         if (ads_check(ads_start))
             break;
 
-        ads1256_start_conversion(loadcell_handle);
-        ads1256_start_conversion(transducer_handle);
+        /* ADS Synchronization */
+        gpio_set_level(LOADCELL_SYNC, LOW);
+        gpio_set_level(TRANS_SYNC, LOW);
+        ets_delay_us(ADS1256_T11_SYNC_US);
+        gpio_set_level(LOADCELL_SYNC, HIGH);
+        gpio_set_level(TRANS_SYNC, HIGH);
 
         /* Wait DRDY */
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
         /* Load Cell + Pressure Transducer reading */
-        ads1256_read_result(loadcell_handle, &current_thrust_raw);
-        ads1256_read_result(transducer_handle, &current_pressure_raw);
+        err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        if (err != ESP_OK)
+            sys_data_g.ads_lost++;
+
+        err = ads1256_read_result(transducer_handle, &current_pressure_raw);
+        if (err != ESP_OK)
+            sys_data_g.ads_lost++;
 
         /* Create ads sample */
         ads_data_t sample = {
@@ -141,6 +150,8 @@ void task_ads(void *pvParameters) {
         memcpy(&ads_data_g[sys_data_g.ads_sample], &sample, sizeof(ads_data_t));
         sys_data_g.ads_sample++;
     }
+
+    ESP_LOGE(TAG_ADS, "Lost Samples/Read Samples : %d/%d", sys_data_g.ads_lost, sys_data_g.ads_sample);
 
 cleanup:
     ads1256_delete(loadcell_handle);

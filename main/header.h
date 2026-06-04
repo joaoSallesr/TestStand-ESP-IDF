@@ -123,14 +123,18 @@ typedef struct __attribute__((packed)) {
 typedef struct {
     uint32_t ads_sample; // 4 Bytes
     uint32_t max_sample; // 4 Bytes
-} sys_data_t;            // 8 Bytes
+    uint32_t ads_lost;   // 4 Bytes
+    uint32_t max_lost;   // 4 Bytes
+} sys_data_t;            // 16 Bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t name_check;  // 4 Bytes
     uint32_t ads_samples; // 4 Bytes
     uint32_t max_samples; // 4 Bytes
-    uint32_t timestamp;   // 4 Byte
-} file_header_t;          // 16 bytes
+    uint32_t ads_lost;    // 4 Bytes
+    uint32_t max_lost;    // 4 Bytes
+    uint32_t timestamp;   // 4 Bytes
+} file_header_t;          // 24 bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t sd_files;
