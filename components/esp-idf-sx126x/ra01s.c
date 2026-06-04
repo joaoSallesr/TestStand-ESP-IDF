@@ -20,7 +20,7 @@ esp_err_t LoRaInit(sx126x_config_t *sx126x_config, sx126x_handle_t *sx126x_handl
 
     /* validate memory allocation */
     sx126x_handle_t out_handle = (sx126x_handle_t)calloc(1, sizeof(*out_handle));
-    ESP_RETURN_ON_FALSE(out_handle, ESP_ERR_NO_MEM, TAG, "No memory for ADS1256 device");
+    ESP_RETURN_ON_FALSE(out_handle, ESP_ERR_NO_MEM, TAG, "No memory for SX126x device");
 
     /* copy device config to out_handle */
     out_handle->dev_config = *sx126x_config;
@@ -31,7 +31,7 @@ esp_err_t LoRaInit(sx126x_config_t *sx126x_config, sx126x_handle_t *sx126x_handl
     /* GPIO config */
     gpio_reset_pin(sx126x_config->ss);
     gpio_set_direction(sx126x_config->ss, GPIO_MODE_OUTPUT);
-    gpio_set_level(sx126x_config->ss, 1);
+    gpio_set_level(sx126x_config->ss, HIGH);
 
     gpio_reset_pin(sx126x_config->reset);
     gpio_set_direction(sx126x_config->reset, GPIO_MODE_OUTPUT);
@@ -207,7 +207,7 @@ void LoRaConfig(sx126x_handle_t handle) {
     uint8_t  bandwidth       = handle->dev_config.bandwidth;
     uint8_t  codingRate      = handle->dev_config.coding_rate;
     uint16_t preambleLength  = handle->dev_config.preamble_length;
-    uint8_t  payloadLen      = handle->dev_config.preamble_length;
+    uint8_t  payloadLen      = handle->dev_config.payload_len;
     bool     crcOn           = handle->dev_config.crc_on;
     bool     invertIrq       = handle->dev_config.invert_iq;
 
@@ -351,9 +351,9 @@ void SetTxPower(sx126x_handle_t handle, int8_t txPowerInDbm) {
 
 void Reset(sx126x_handle_t handle) {
     delay(10);
-    gpio_set_level(handle->dev_config.reset, 0);
+    gpio_set_level(handle->dev_config.reset, LOW);
     delay(20);
-    gpio_set_level(handle->dev_config.reset, 1);
+    gpio_set_level(handle->dev_config.reset, HIGH);
     delay(10);
     // ensure BUSY is low (state meachine ready)
     WaitForIdle(handle, BUSY_WAIT, "Reset", true);
@@ -887,6 +887,6 @@ void ReadCommand(sx126x_handle_t handle, uint8_t cmd, uint8_t *data, uint8_t num
         ESP_LOGE(TAG, "ReadCommand malloc fail");
     }
 
-    vTaskDelay(1);
+    esp_rom_delay_us(10);
     WaitForIdle(handle, BUSY_WAIT, "end ReadCommand", false);
 }

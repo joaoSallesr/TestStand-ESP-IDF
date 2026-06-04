@@ -1,6 +1,5 @@
 #pragma once
 
-// INCLUDES
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -23,19 +22,28 @@
 #include <driver/spi_master.h>
 #include <esp_vfs_fat.h>
 #include <hal/spi_types.h>
+#include <nvs.h>
+#include <nvs_flash.h>
 #include <sdmmc_cmd.h>
 
 #include <freertos/FreeRTOS.h>
+#include <freertos/event_groups.h>
+#include <freertos/queue.h>
 #include <freertos/ringbuf.h>
 #include <freertos/task.h>
 
 #include "esp_ads1256.h"
+#include "esp_littlefs.h"
+#include "max6675.h"
 #include "ra01s.h"
 
-// GPIO
+#define LOW  0
+#define HIGH 1
+
+/* GPIO */
 #define BUZZER_GPIO   GPIO_NUM_4
-#define IGNITOR_GPIO  GPIO_NUM_5
-#define SQUIB_GPIO    GPIO_NUM_7
+#define IGNITION_GPIO GPIO_NUM_5 // IGNITION COMMAND OUTPUT
+#define SQUIB_GPIO    GPIO_NUM_7 // SQUIB READING
 #define MOSI          GPIO_NUM_11
 #define MISO          GPIO_NUM_13
 #define CLK           GPIO_NUM_12
@@ -56,60 +64,101 @@
 #define MAX3_CS       GPIO_NUM_18
 #define MAX3_DRDY     GPIO_NUM_6
 #define LORA_CS       GPIO_NUM_14
-#define LORA_DIO1     GPIO_NUM_15 // LORA_DRDY
+#define LORA_DIO1     GPIO_NUM_2 // LORA_DRDY
 #define LORA_BUSY     GPIO_NUM_41
 #define LORA_RESET    GPIO_NUM_40
 
-// SPI CONFIG
+/* SPI CONFIG */
 #define SPI_HOST SPI2_HOST
 #define DMA_CHAN SPI_DMA_CH_AUTO
 
-// MEMORY CONFIG
-#define MAX_SAMPLES 700
-#define ADS_SAMPLES 7000
+/* IGNITE CONFIG */
+#define CMD_IGNITION 0xAA
 
-// STATUS FLAGS
-#define IDLE      (1 << 0)
-#define ARMED     (1 << 1)
-#define FULL_ACQ  (1 << 2)
-#define PART_ACQ  (1 << 3)
-#define SAVE_DATA (1 << 4)
-#define SEND_DATA (1 << 5)
-#define END_TEST  (1 << 6)
+/* ACQUIRE CONFIG */
+#define ADS_SAMPLES         7000
+#define ADS_ACQ_DURATION_MS 7000
 
-// SAMPLE STRUCTURES
+#define MAX_SAMPLES         700
+#define MAX_ACQ_DURATION_MS 20000
+
+/* STATUS FLAGS */
+#define TASK_INIT   BIT(0)
+#define SETUP_OK    BIT(1)
+#define FATAL_ERROR BIT(2)
+#define ARMED       BIT(3)
+#define ACQUIRE     BIT(4)
+#define ADS_DONE    BIT(5)
+#define MAX_DONE    BIT(6)
+#define SD_DONE     BIT(7)
+#define LFS_DONE    BIT(8)
+#define SAVE_DATA   BIT(9)
+#define NVS_EDIT    BIT(10)
+#define SEND_DATA   BIT(11)
+#define END_TEST    BIT(12)
+
+/* INIT FLAGS */
+#define ADS_INIT  BIT(0)
+#define MAX_INIT  BIT(1)
+#define SD_INIT   BIT(2)
+#define LFS_INIT  BIT(3)
+#define LORA_INIT BIT(4)
+
+#define SETUP_INIT (ADS_INIT | MAX_INIT | SD_INIT | LFS_INIT | LORA_INIT)
+
+/* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp; // 4 Bytes
-    int32_t  loadcell;  // 4 Bytes
-    int32_t  trans;     // 4 Bytes
-} ads_data_t;           // 12 Bytes/sample -> 12 * ADS_SAMPLES
+    uint32_t timestamp;    // 4 Bytes
+    int32_t  thrust_raw;   // 4 Bytes
+    int32_t  pressure_raw; // 4 Bytes
+} ads_data_t;              // 12 Bytes/sample -> 12 * ADS_SAMPLES
 
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp; // 4 Bytes
-    int16_t  max1;      // 2 Bytes
-    int16_t  max2;      // 2 Bytes
-    int16_t  max3;      // 2 Bytes
-} max_data_t;           // 10 Bytes
+    uint32_t timestamp;        // 4 Bytes
+    uint16_t temperature1_raw; // 2 Bytes
+    uint16_t temperature2_raw; // 2 Bytes
+} max_data_t;                  // 8 Bytes
 
-// SYSTEM STRUCTURE
-typedef struct __attribute__((packed)) {
-    volatile uint32_t ads_sample; // 4 Bytes
-    volatile uint32_t max_sample; // 4 Bytes
-    volatile uint16_t status;     // 2 Bytes
-} sys_data_t;                     // 10 Bytes
+/* SYSTEM STRUCTURES */
+typedef struct {
+    uint32_t ads_sample; // 4 Bytes
+    uint32_t max_sample; // 4 Bytes
+    uint32_t ads_lost;   // 4 Bytes
+    uint32_t max_lost;   // 4 Bytes
+} sys_data_t;            // 16 Bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t name_check;  // 4 Bytes
     uint32_t ads_samples; // 4 Bytes
     uint32_t max_samples; // 4 Bytes
-    uint32_t timestamp;   // 4 Byte
-} file_header_t;          // 16 bytes
+    uint32_t ads_lost;    // 4 Bytes
+    uint32_t max_lost;    // 4 Bytes
+    uint32_t timestamp;   // 4 Bytes
+} file_header_t;          // 24 bytes
+
+typedef struct __attribute__((packed)) {
+    uint32_t sd_files;
+    uint32_t lfs_files;
+    bool     format;
+} file_counter_t;
+
+/* EVENT STRUCTURES */
+typedef enum {
+    EVT_INIT_READY,    // task_status finished peripheral setup
+    EVT_SETUP_OK,      // system tasks initialized correctly
+    EVT_SETUP_FAILED,  // system initialization failed
+    EVT_ARM,           // system armed
+    EVT_IGNITION_DONE, // ignition succeeded
+    EVT_ADS_DONE,      // task_ads finished
+    EVT_MAX_DONE,      // task_max finished
+    EVT_ACQUIRE_DONE,  // acquisition finished
+    EVT_SAVE_DONE,     // sd and lfs finished writing
+    EVT_SEND_DONE,     // task_lora finished sending
+    EVT_NVS_DONE,      // task_nvs finished
+} status_event_t;
 
 typedef enum {
-    EVT_ARM,       // system armed
-    EVT_IGNITION,  // ignition started
-    EVT_ADS_DONE,  // task_ads finished full acquisition
-    EVT_MAX_DONE,  // task_max finished
-    EVT_SAVE_DONE, // task_sd finished writing
-    EVT_SEND_DONE, // task_lora finished sending
-} sys_event_t;
+    EVT_IGNITION_START,   // lora sends ignition cmd
+    EVT_IGNITION_SUCCESS, // stop ignition detection
+    EVT_IGNITION_FAILED,  // continue ignition detection
+} ignition_event_t;
