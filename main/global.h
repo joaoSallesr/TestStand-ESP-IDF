@@ -10,7 +10,6 @@ extern file_counter_t file_counter_g;
 
 /* QUEUE HANDLE*/
 extern QueueHandle_t xStatusQueue;
-extern QueueHandle_t xIgnitionQueue;
 
 /* EVENT HANDLE*/
 extern EventGroupHandle_t xStatusEvent;

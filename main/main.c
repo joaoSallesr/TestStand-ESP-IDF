@@ -9,8 +9,7 @@ void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
 
     /* Create Queue */
-    xStatusQueue   = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
-    xIgnitionQueue = xQueueCreate(IGNITION_QUEUE_SIZE, sizeof(ignition_event_t));
+    xStatusQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
 
     /* Create Event Group */
     xStatusEvent = xEventGroupCreate();

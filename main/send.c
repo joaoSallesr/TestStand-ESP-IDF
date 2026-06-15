@@ -75,6 +75,8 @@ void task_lora(void *pvParameters) {
     bool            ok;
     uint16_t        lost = 0;
 
+    xTaskLora = xTaskGetCurrentTaskHandle();
+
     err = lora_init(&lora_handle);
     if (err != ESP_OK) {
         goto setup_error;
@@ -102,15 +104,22 @@ void task_lora(void *pvParameters) {
     while (true) {
         uint8_t len = LoRaReceive(lora_handle, rx_buf, sizeof(rx_buf));
         if (len > 0 && rx_buf[0] == CMD_IGNITION) {
-            ignition_event_t ign_evt = EVT_IGNITION_START;
-            xQueueSend(xIgnitionQueue, &ign_evt, portMAX_DELAY);
 
-            xQueueReceive(xIgnitionQueue, &ign_evt, portMAX_DELAY);
-            if (ign_evt == EVT_IGNITION_SUCCESS)
-                break;
-            else
-                continue;
+            xTaskNotify(xTaskIgnite, EVT_IGNITION_START, eSetValueWithOverwrite);
+
+            uint32_t result;
+            ulTaskNotifyValueClear(NULL, 0xFFFFFFFF);
+            if (xTaskNotifyWait(0, 0xFFFFFFFF, &result, pdMS_TO_TICKS(200))) {
+                if (result == EVT_IGNITION_SUCCESS) {
+                    break; // LoRa receiver -> LoRa sender
+                } else {
+                    continue; // loop back
+                }
+            } else {
+                ESP_LOGE(TAG_LORA, "Ignition timeout");
+            }
         }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 

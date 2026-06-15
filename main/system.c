@@ -129,8 +129,6 @@ static esp_err_t setup_peripherals(void) {
 
     if (xStatusQueue == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (xIgnitionQueue == NULL)
-        return ESP_ERR_INVALID_ARG;
     if (xStatusEvent == NULL)
         return ESP_ERR_INVALID_ARG;
     if (xInitEvent == NULL)
