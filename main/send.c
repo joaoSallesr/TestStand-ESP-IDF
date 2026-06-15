@@ -104,7 +104,12 @@ void task_lora(void *pvParameters) {
         if (len > 0 && rx_buf[0] == CMD_IGNITION) {
             ignition_event_t ign_evt = EVT_IGNITION_START;
             xQueueSend(xIgnitionQueue, &ign_evt, portMAX_DELAY);
-            break;
+
+            xQueueReceive(xIgnitionQueue, &ign_evt, portMAX_DELAY);
+            if (ign_evt == EVT_IGNITION_SUCCESS)
+                break;
+            else
+                continue;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
