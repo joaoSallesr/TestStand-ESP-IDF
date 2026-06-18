@@ -108,16 +108,31 @@
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
+    uint8_t  type;
+    uint16_t seq;
+} packet_header_t;
+
+typedef struct __attribute__((packed)) {
     uint32_t timestamp;    // 4 Bytes
     int32_t  thrust_raw;   // 4 Bytes
     int32_t  pressure_raw; // 4 Bytes
 } ads_data_t;              // 12 Bytes/sample -> 12 * ADS_SAMPLES
 
 typedef struct __attribute__((packed)) {
+    packet_header_t header;
+    ads_data_t      data;
+} ads_packet_t;
+
+typedef struct __attribute__((packed)) {
     uint32_t timestamp;        // 4 Bytes
     uint16_t temperature1_raw; // 2 Bytes
     uint16_t temperature2_raw; // 2 Bytes
 } max_data_t;                  // 8 Bytes
+
+typedef struct __attribute__((packed)) {
+    packet_header_t header;
+    max_data_t      data;
+} max_packet_t;
 
 /* SYSTEM STRUCTURES */
 typedef struct {
@@ -162,3 +177,12 @@ typedef enum {
     EVT_IGNITION_SUCCESS, // stop ignition detection
     EVT_IGNITION_FAILED,  // continue ignition detection
 } ignition_event_t;
+
+typedef enum {
+    PKT_NONE,
+    PKT_ADS,
+    PKT_MAX,
+    PKT_EVENT,
+    PKT_CMD,
+    PKT_ACK,
+} packet_type_t;

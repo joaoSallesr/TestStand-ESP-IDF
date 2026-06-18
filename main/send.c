@@ -124,10 +124,17 @@ void task_lora(void *pvParameters) {
     }
 
     xEventGroupWaitBits(xStatusEvent, SEND_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    static uint16_t pkt_seq = 0;
 
     /* Send ADS samples */
     for (uint32_t i = 0; i < sys_data_g.ads_sample; i++) {
-        ok = LoRaSend(lora_handle, (uint8_t *)&ads_data_g[i], sizeof(ads_data_t), SX126x_TXMODE_ASYNC);
+
+        ads_packet_t ads_packet = {
+            .header = {.type = PKT_ADS, .seq = pkt_seq++},
+            .data   = ads_data_g[i],
+        };
+
+        ok = LoRaSend(lora_handle, (uint8_t *)&ads_packet, sizeof(ads_packet), SX126x_TXMODE_ASYNC);
         if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
@@ -158,7 +165,13 @@ void task_lora(void *pvParameters) {
 
     /* Send MAX samples */
     for (uint32_t i = 0; i < sys_data_g.max_sample; i++) {
-        ok = LoRaSend(lora_handle, (uint8_t *)&max_data_g[i], sizeof(max_data_t), SX126x_TXMODE_ASYNC);
+
+        max_packet_t max_packet = {
+            .header = {.type = PKT_MAX, .seq = pkt_seq++},
+            .data   = max_data_g[i],
+        };
+
+        ok = LoRaSend(lora_handle, (uint8_t *)&max_packet, sizeof(max_packet), SX126x_TXMODE_ASYNC);
         if (!ok) {
             ESP_LOGI(TAG_LORA, "Sample %lu lost.", i);
             continue;
