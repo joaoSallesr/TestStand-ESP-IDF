@@ -131,11 +131,13 @@ void task_ads(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
         /* Load Cell + Pressure Transducer reading */
-        err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        // err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        err = ads1256_read_continuous(loadcell_handle, &current_thrust_raw);
         if (err != ESP_OK)
             sys_data_g.ads_lost++;
 
-        err = ads1256_read_result(transducer_handle, &current_pressure_raw);
+        // err = ads1256_read_result(transducer_handle, &current_pressure_raw);
+        err = ads1256_read_continuous(transducer_handle, &current_pressure_raw);
         if (err != ESP_OK)
             sys_data_g.ads_lost++;
 
@@ -154,6 +156,9 @@ void task_ads(void *pvParameters) {
     ESP_LOGE(TAG_ADS, "Lost Samples/Read Samples : %d/%d", sys_data_g.ads_lost, sys_data_g.ads_sample);
 
 cleanup:
+    ads1256_send_cmd(loadcell_handle, ADS1256_CMD_SDATAC);
+    ads1256_send_cmd(transducer_handle, ADS1256_CMD_SDATAC);
+
     ads1256_delete(loadcell_handle);
     ads1256_delete(transducer_handle);
 
