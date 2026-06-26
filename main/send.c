@@ -77,7 +77,7 @@ static void telem_transmit(sx126x_handle_t lora_handle) {
     }
 }
 
-static esp_err_t telemetry_mode(sx126x_handle_t lora_handle, const EventBits_t bits_to_wait) {
+static esp_err_t telem_mode(sx126x_handle_t lora_handle, const EventBits_t bits_to_wait) {
     EventBits_t bits;
 
     do {
@@ -171,7 +171,7 @@ void task_lora(void *pvParameters) {
     telem_post(PKT_INFO, "LORA_RDY");
 
     /* Telemetry mode - Wait for ARMED */
-    err = telemetry_mode(lora_handle, ARMED | FATAL_ERROR);
+    err = telem_mode(lora_handle, ARMED | FATAL_ERROR);
 
     /* Listen for ignition command */
     {
@@ -205,7 +205,7 @@ void task_lora(void *pvParameters) {
     xEventGroupWaitBits(xStatusEventGroup, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     /* Telemetry mode - Wait for SEND_DATA */
-    err = telemetry_mode(lora_handle, SEND_DATA);
+    err = telem_mode(lora_handle, SEND_DATA);
 
     /* Data packet number - Track lost packets */
     static uint16_t pkt_num = 0;
@@ -290,6 +290,7 @@ void task_lora(void *pvParameters) {
     status_event_t evt = EVT_SEND_DONE;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
+    telem_transmit(lora_handle);
 cleanup:
     gpio_intr_disable(LORA_DIO1);
     gpio_isr_handler_remove(LORA_DIO1);
