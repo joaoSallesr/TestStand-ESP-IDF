@@ -16,10 +16,10 @@ bool ads_check(int64_t ads_start) {
     bool buffer_full  = sys_data_g.ads_sample >= ADS_SAMPLES;
     bool time_elapsed = (esp_timer_get_time() - ads_start) >= (ADS_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
+    if ((xEventGroupGetBits(xStatusEventGroup) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_ADS_DONE;
-            xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+            xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_ADS, "ADS acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
@@ -110,8 +110,8 @@ void task_ads(void *pvParameters) {
     }
 
     /* ADS initialized -> Wait for acquisition to start */
-    xEventGroupSetBits(xInitEvent, ADS_INIT);
-    xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(xInitEventGroup, ADS_INIT);
+    xEventGroupWaitBits(xStatusEventGroup, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t ads_start = esp_timer_get_time();
 
@@ -169,7 +169,7 @@ cleanup:
 
 setup_error: {
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 }
     goto cleanup;
 }

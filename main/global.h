@@ -9,11 +9,12 @@ extern sys_data_t     sys_data_g;
 extern file_counter_t file_counter_g;
 
 /* QUEUE HANDLE*/
-extern QueueHandle_t xStatusQueue;
+extern QueueHandle_t xEventQueue;
+extern QueueHandle_t xTelemQueue;
 
 /* EVENT HANDLE*/
-extern EventGroupHandle_t xStatusEvent;
-extern EventGroupHandle_t xInitEvent;
+extern EventGroupHandle_t xStatusEventGroup;
+extern EventGroupHandle_t xInitEventGroup;
 
 /* TASK HANDLE */
 extern TaskHandle_t xTaskStatus;
@@ -33,3 +34,6 @@ void task_lfs(void *pvParameters);
 void task_nvs(void *pvParameters);
 void task_lora(void *pvParameters);
 void task_log(void *pvParameters);
+
+/* GLOBAL FUNCTIONS */
+void telem_post(packet_type_t type, const char *msg);

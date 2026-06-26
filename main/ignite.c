@@ -5,7 +5,7 @@ static const char *TAG_IGN = "ignition";
 void task_ignite(void *pvParameters) {
 
     /* Wait for armed */
-    xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEventGroup, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
     while (true) {
         uint32_t cmd;

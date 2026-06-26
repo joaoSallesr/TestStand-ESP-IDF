@@ -108,20 +108,10 @@
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
-    uint8_t  type;
-    uint16_t seq;
-} packet_header_t;
-
-typedef struct __attribute__((packed)) {
     uint32_t timestamp;    // 4 Bytes
     int32_t  thrust_raw;   // 4 Bytes
     int32_t  pressure_raw; // 4 Bytes
-} ads_data_t;              // 12 Bytes/sample -> 12 * ADS_SAMPLES
-
-typedef struct __attribute__((packed)) {
-    packet_header_t header;
-    ads_data_t      data;
-} ads_packet_t;
+} ads_data_t;              // 12 Bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t timestamp;        // 4 Bytes
@@ -129,13 +119,39 @@ typedef struct __attribute__((packed)) {
     uint16_t temperature2_raw; // 2 Bytes
 } max_data_t;                  // 8 Bytes
 
+/* TELEMETRY STRUCTURES */
+typedef enum __attribute__((packed)) {
+    PKT_EVT  = 0x01,
+    PKT_ACK  = 0x02,
+    PKT_INFO = 0x03,
+    PKT_ADS  = 0x04,
+    PKT_MAX  = 0x05,
+    PKT_FAIL = 0x06,
+} packet_type_t; // 1 byte
+
 typedef struct __attribute__((packed)) {
-    packet_header_t header;
-    max_data_t      data;
-} max_packet_t;
+    packet_type_t type; // 1 byte
+    uint16_t      seq;  // 2 bytes
+} packet_header_t;      // 3 bytes
+
+typedef struct __attribute__((packed)) {
+    packet_type_t type;      // 1 byte
+    uint32_t      timestamp; // 4 bytes
+    char          msg[11];   // 11 bytes
+} msg_packet_t;              // 16 bytes
+
+typedef struct __attribute__((packed)) {
+    packet_header_t header; // 3 bytes
+    ads_data_t      data;   // 12 Bytes
+} ads_packet_t;             // 15 bytes
+
+typedef struct __attribute__((packed)) {
+    packet_header_t header; // 3 bytes
+    max_data_t      data;   // 8 Bytes
+} max_packet_t;             // 11 bytes
 
 /* SYSTEM STRUCTURES */
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint32_t ads_sample; // 4 Bytes
     uint32_t max_sample; // 4 Bytes
     uint32_t ads_lost;   // 4 Bytes
@@ -158,7 +174,7 @@ typedef struct __attribute__((packed)) {
 } file_counter_t;
 
 /* EVENT STRUCTURES */
-typedef enum {
+typedef enum __attribute__((packed)) {
     EVT_INIT_READY,    // task_status finished peripheral setup
     EVT_SETUP_OK,      // system tasks initialized correctly
     EVT_SETUP_FAILED,  // system initialization failed
@@ -172,17 +188,8 @@ typedef enum {
     EVT_NVS_DONE,      // task_nvs finished
 } status_event_t;
 
-typedef enum {
+typedef enum __attribute__((packed)) {
     EVT_IGNITION_START,   // lora sends ignition cmd
     EVT_IGNITION_SUCCESS, // stop ignition detection
     EVT_IGNITION_FAILED,  // continue ignition detection
 } ignition_event_t;
-
-typedef enum {
-    PKT_NONE,
-    PKT_ADS,
-    PKT_MAX,
-    PKT_EVENT,
-    PKT_CMD,
-    PKT_ACK,
-} packet_type_t;
