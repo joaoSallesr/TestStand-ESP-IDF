@@ -10,6 +10,9 @@ file_counter_t file_counter_g = {0};
 QueueHandle_t xEventQueue = NULL;
 QueueHandle_t xTelemQueue = NULL;
 
+/* SEMAPHORE */
+SemaphoreHandle_t xSPIMutex = NULL;
+
 /* EVENT HANDLE*/
 EventGroupHandle_t xStatusEventGroup = NULL;
 EventGroupHandle_t xInitEventGroup   = NULL;

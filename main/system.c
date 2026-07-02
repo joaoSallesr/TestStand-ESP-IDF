@@ -131,6 +131,8 @@ static esp_err_t setup_peripherals(void) {
         return ESP_ERR_INVALID_ARG;
     if (xTelemQueue == NULL)
         return ESP_ERR_INVALID_ARG;
+    if (xSPIMutex == NULL)
+        return ESP_ERR_INVALID_ARG;
     if (xStatusEventGroup == NULL)
         return ESP_ERR_INVALID_ARG;
     if (xInitEventGroup == NULL)

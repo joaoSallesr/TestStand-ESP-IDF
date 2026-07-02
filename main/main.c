@@ -12,6 +12,9 @@ void app_main(void) {
     xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
     xTelemQueue = xQueueCreate(TELEM_QUEUE_SIZE, sizeof(msg_packet_t));
 
+    /* Create mutex */
+    xSPIMutex = xSemaphoreCreateMutex();
+
     /* Create Event Group */
     xStatusEventGroup = xEventGroupCreate();
     xInitEventGroup   = xEventGroupCreate();

@@ -43,6 +43,7 @@ static esp_err_t loadcell_init(ads1256_handle_t *loadcell_handle) {
         .neg_channel     = ADS1256_MUX_AIN1,
         .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
+        .spi_mutex       = xSPIMutex,
     };
 
     /* Load Cell initialization */
@@ -70,6 +71,7 @@ static esp_err_t transducer_init(ads1256_handle_t *trans_handle) {
         .neg_channel     = ADS1256_MUX_AIN1,
         .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
+        .spi_mutex       = xSPIMutex,
     };
 
     /* Pressure Transducer initialization */

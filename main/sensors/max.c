@@ -26,8 +26,9 @@ static esp_err_t max_init(max6675_handle_t *max_handle, gpio_num_t cs_num) {
 
     /* MAX6675 struct setup */
     max6675_config_t max_cfg = {
-        .spi_host = SPI_HOST,
-        .cs       = cs_num,
+        .spi_host  = SPI_HOST,
+        .cs        = cs_num,
+        .spi_mutex = xSPIMutex,
     };
 
     /* MAX initialization */

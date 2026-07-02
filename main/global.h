@@ -12,6 +12,9 @@ extern file_counter_t file_counter_g;
 extern QueueHandle_t xEventQueue;
 extern QueueHandle_t xTelemQueue;
 
+/* SEMAPHORE */
+extern SemaphoreHandle_t xSPIMutex;
+
 /* EVENT HANDLE*/
 extern EventGroupHandle_t xStatusEventGroup;
 extern EventGroupHandle_t xInitEventGroup;

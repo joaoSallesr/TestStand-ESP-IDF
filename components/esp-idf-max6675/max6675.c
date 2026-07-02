@@ -69,6 +69,7 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
         .rx_buffer = &rx,
     };
 
+    xSemaphoreTake(handle->dev_config.spi_mutex, portMAX_DELAY);
     ESP_RETURN_ON_ERROR(spi_device_acquire_bus(handle->spi_handle, portMAX_DELAY), TAG,
                         "Failed to acquire bus for read");
 
@@ -90,6 +91,7 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
 done:
     cs_high(handle);
     spi_device_release_bus(handle->spi_handle);
+    xSemaphoreGive(handle->dev_config.spi_mutex);
 
     if (ret != ESP_OK)
         return ret;

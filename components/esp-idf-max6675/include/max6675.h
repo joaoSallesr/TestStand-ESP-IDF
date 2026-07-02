@@ -26,8 +26,9 @@
  * @brief MAX6675 configuration structure.
  */
 typedef struct max6675_config_s {
-    spi_host_device_t spi_host; /*!< SPI bus selected */
-    gpio_num_t        cs;       /*!< max6675 CS pin */
+    spi_host_device_t spi_host;  /*!< SPI bus selected */
+    gpio_num_t        cs;        /*!< MAX6675 CS pin */
+    SemaphoreHandle_t spi_mutex; /*!< MAX6675 SPI bus mutex*/
 } max6675_config_t;
 
 /**
