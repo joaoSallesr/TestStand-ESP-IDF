@@ -29,7 +29,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <freertos/queue.h>
-#include <freertos/ringbuf.h>
 #include <freertos/task.h>
 
 #include "esp_ads1256.h"
