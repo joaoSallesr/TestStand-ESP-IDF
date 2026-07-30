@@ -167,7 +167,7 @@ void task_lora(void *pvParameters) {
     SetDioIrqParams(lora_handle, irqMask, dio1Mask, 0, 0);
 
     /* LoRa initialized -> Start packet transmission */
-    xEventGroupSetBits(xInitEventGroup, LORA_INIT);
+    // xEventGroupSetBits(xInitEventGroup, LORA_INIT);
     telem_post(PKT_INFO, "LORA_RDY");
 
     /* Telemetry mode - Wait for ARMED */

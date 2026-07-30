@@ -263,7 +263,7 @@ void task_lfs(void *pvParameters) {
 
     /* Create log file */
     char log_name[FILENAME_LENGTH];
-    snprintf(log_name, FILENAME_LENGTH, "%s/flight%ld.bin", littlefs_cfg.base_path, file_counter_g.lfs_files);
+    snprintf(log_name, FILENAME_LENGTH, "%s/flight%lu.bin", littlefs_cfg.base_path, file_counter_g.lfs_files);
     ESP_LOGI(TAG_LFS, "Created file %s", log_name);
 
     FILE *f = fopen(log_name, "wb");

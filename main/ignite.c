@@ -8,20 +8,26 @@ void task_ignite(void *pvParameters) {
     xEventGroupWaitBits(xStatusEventGroup, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
     while (true) {
-        uint32_t cmd;
+        uint16_t wait_time = 10;
 
         /* Wait for ignition */
-        xTaskNotifyWait(0, 0xFFFFFFFF, &cmd, portMAX_DELAY);
+        while (wait_time > 0) {
+            ESP_LOGI(TAG_IGN, "Countdown: %u", wait_time);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            wait_time--;
+        }
 
-        if (cmd == EVT_IGNITION_START) {
+        while (true) {
             bool ignited = false;
 
             for (int i = 0; i < 3; i++) {
-                ESP_LOGW(TAG_IGN, "IGNITION STARTED");
+                ESP_LOGW(TAG_IGN, "IGNITION PULSE %d/3", i + 1);
 
                 gpio_set_level(IGNITION_GPIO, HIGH);
                 vTaskDelay(pdMS_TO_TICKS(1)); // TESTAR ==============================================
                 gpio_set_level(IGNITION_GPIO, LOW);
+
+                vTaskDelay(pdMS_TO_TICKS(10));
 
                 if (gpio_get_level(SQUIB_GPIO) == LOW) {
                     ignited = true;
@@ -30,12 +36,18 @@ void task_ignite(void *pvParameters) {
             }
 
             if (ignited) {
-                xTaskNotify(xTaskLora, EVT_IGNITION_SUCCESS, eSetValueWithOverwrite);
+                ESP_LOGW(TAG_IGN, "ACQUISITION STARTING");
+                status_event_t evt = EVT_IGNITION_DONE;
+                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
                 break;
             } else {
-                xTaskNotify(xTaskLora, EVT_IGNITION_FAILED, eSetValueWithOverwrite);
+                ESP_LOGW(TAG_IGN, "Ignition not detected, retrying");
+                vTaskDelay(pdMS_TO_TICKS(500));
+                continue;
             }
         }
+
+        break;
     }
 
     vTaskDelete(NULL);

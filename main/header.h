@@ -97,13 +97,13 @@
 #define END_TEST    BIT(12)
 
 /* INIT FLAGS */
-#define ADS_INIT  BIT(0)
-#define MAX_INIT  BIT(1)
-#define SD_INIT   BIT(2)
-#define LFS_INIT  BIT(3)
-#define LORA_INIT BIT(4)
+#define ADS_INIT BIT(0)
+#define MAX_INIT BIT(1)
+#define SD_INIT  BIT(2)
+#define LFS_INIT BIT(3)
+// #define LORA_INIT BIT(4)
 
-#define SETUP_INIT (ADS_INIT | MAX_INIT | SD_INIT | LFS_INIT | LORA_INIT)
+#define SETUP_INIT (ADS_INIT | MAX_INIT | SD_INIT | LFS_INIT)
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
