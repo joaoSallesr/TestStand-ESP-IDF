@@ -367,6 +367,12 @@ setup_error:
 
 format_device:
     ESP_LOGW(TAG_LFS, "LittleFS formatted");
+
+    if (lfs_mounted) {
+        esp_vfs_littlefs_unregister(littlefs_cfg.partition_label);
+        ESP_LOGI(TAG_LFS, "LittleFS unmounted");
+    }
+
     vTaskDelete(NULL);
 }
 

@@ -20,4 +20,3 @@ EventGroupHandle_t xInitEventGroup   = NULL;
 TaskHandle_t xTaskStatus = NULL;
 TaskHandle_t xTaskIgnite = NULL;
 TaskHandle_t xTaskAds    = NULL;
-TaskHandle_t xTaskLora   = NULL;

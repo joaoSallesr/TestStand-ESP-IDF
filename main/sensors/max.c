@@ -74,12 +74,16 @@ void task_max(void *pvParameters) {
 
         /* MAX readings */
         err = max6675_read(max1_handle, &current_temperature1_raw);
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             sys_data_g.max_lost++;
+            continue;
+        }
 
         err = max6675_read(max2_handle, &current_temperature2_raw);
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             sys_data_g.max_lost++;
+            continue;
+        }
 
         /* Create MAX sample */
         max_data_t sample = {

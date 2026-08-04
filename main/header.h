@@ -39,6 +39,7 @@
 #define HIGH 1
 
 /* GPIO */
+#define IGNITE_BTN    GPIO_NUM_0
 #define BUZZER_GPIO   GPIO_NUM_4
 #define IGNITION_GPIO GPIO_NUM_5 // IGNITION COMMAND OUTPUT
 #define SQUIB_GPIO    GPIO_NUM_7 // SQUIB READING
@@ -57,14 +58,10 @@
 #define MAX1_CS       GPIO_NUM_16
 #define MAX2_CS       GPIO_NUM_17
 #define MAX3_CS       GPIO_NUM_18
-#define MAX3_DRDY     GPIO_NUM_6
 
 /* SPI CONFIG */
 #define SPI_HOST SPI2_HOST
 #define DMA_CHAN SPI_DMA_CH_AUTO
-
-/* IGNITE CONFIG */
-#define CMD_IGNITION 0xAA
 
 /* ACQUIRE CONFIG */
 #define ADS_SAMPLES         7000
@@ -85,7 +82,7 @@
 #define LFS_DONE    BIT(8)
 #define SAVE_DATA   BIT(9)
 #define NVS_EDIT    BIT(10)
-#define END_TEST    BIT(12)
+#define END_TEST    BIT(11)
 
 /* INIT FLAGS */
 #define ADS_INIT BIT(0)
@@ -143,9 +140,3 @@ typedef enum __attribute__((packed)) {
     EVT_SAVE_DONE,     // sd and lfs finished writing
     EVT_NVS_DONE,      // task_nvs finished
 } status_event_t;
-
-typedef enum __attribute__((packed)) {
-    EVT_IGNITION_START,   // lora sends ignition cmd
-    EVT_IGNITION_SUCCESS, // stop ignition detection
-    EVT_IGNITION_FAILED,  // continue ignition detection
-} ignition_event_t;

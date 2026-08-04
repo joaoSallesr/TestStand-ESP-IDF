@@ -22,7 +22,6 @@ extern EventGroupHandle_t xInitEventGroup;
 extern TaskHandle_t xTaskStatus;
 extern TaskHandle_t xTaskIgnite;
 extern TaskHandle_t xTaskAds;
-extern TaskHandle_t xTaskLora;
 
 /* TASKS */
 void task_setup(void *pvParameters);
@@ -34,5 +33,4 @@ void task_max(void *pvParameters);
 void task_sd(void *pvParameters);
 void task_lfs(void *pvParameters);
 void task_nvs(void *pvParameters);
-void task_lora(void *pvParameters);
 void task_log(void *pvParameters);

@@ -80,6 +80,11 @@ static esp_err_t setup_peripherals(void) {
     gpio_set_direction(IGNITION_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(IGNITION_GPIO, LOW);
 
+    /* Ignition button (active-low) */
+    gpio_reset_pin(IGNITE_BTN);
+    gpio_set_direction(IGNITE_BTN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(IGNITE_BTN, GPIO_PULLUP_ONLY);
+
     /* Set to LOW:delay:HIGH before asking for data */
     gpio_reset_pin(LOADCELL_SYNC);
     gpio_set_direction(LOADCELL_SYNC, GPIO_MODE_OUTPUT);
@@ -192,12 +197,16 @@ void task_setup(void *pvParameters) {
         goto setup_error;
     }
 
-    vTaskDelete(NULL);
+    goto done;
 
 setup_error: {
     status_event_t evt = EVT_SETUP_FAILED;
     xQueueSend(xEventQueue, &evt, portMAX_DELAY);
+
+    vTaskDelete(NULL);
 }
+
+done:
     vTaskDelete(NULL);
 }
 
@@ -282,6 +291,10 @@ void task_status(void *pvParameters) {
             xEventGroupClearBits(xStatusEventGroup, NVS_EDIT);
             xEventGroupSetBits(xStatusEventGroup, END_TEST);
             ESP_LOGI(TAG_SYS, "Test complete.");
+            break;
+
+        default:
+            ESP_LOGW(TAG_SYS, "Unknown event: %d", evt);
             break;
         }
     }

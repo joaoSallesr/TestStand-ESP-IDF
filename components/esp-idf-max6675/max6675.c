@@ -46,7 +46,7 @@ esp_err_t max6675_init(const max6675_config_t *max6675_config, max6675_handle_t 
 
     /* add MAX6675 to SPI bus */
     ESP_GOTO_ON_ERROR(spi_bus_add_device(max6675_config->spi_host, &max_dev_config, &out_handle->spi_handle),
-                      err_handle, TAG, "Failed to add ADS1256 device to SPI bus");
+                      err_handle, TAG, "Failed to add MAX6675 device to SPI bus");
 
     *max6675_handle = out_handle;
     return ESP_OK;
@@ -70,8 +70,8 @@ esp_err_t max6675_read(max6675_handle_t handle, uint16_t *out_raw) {
     };
 
     xSemaphoreTake(handle->dev_config.spi_mutex, portMAX_DELAY);
-    ESP_RETURN_ON_ERROR(spi_device_acquire_bus(handle->spi_handle, portMAX_DELAY), TAG,
-                        "Failed to acquire bus for read");
+    ESP_GOTO_ON_ERROR(spi_device_acquire_bus(handle->spi_handle, portMAX_DELAY), done, TAG,
+                      "Failed to acquire bus for read");
 
     cs_low(handle);
     ESP_GOTO_ON_ERROR(spi_device_polling_transmit(handle->spi_handle, &t), done, TAG, "Failed to transmit reading");

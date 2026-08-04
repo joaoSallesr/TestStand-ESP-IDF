@@ -98,8 +98,10 @@ void task_ads(void *pvParameters) {
         /* Load Cell reading */
         // err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
         err = ads1256_read_continuous(loadcell_handle, &current_thrust_raw);
-        if (err != ESP_OK)
+        if (err != ESP_OK) {
             sys_data_g.ads_lost++;
+            continue;
+        }
 
         /* Create ads sample */
         ads_data_t sample = {
