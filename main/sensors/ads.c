@@ -57,49 +57,14 @@ static esp_err_t loadcell_init(ads1256_handle_t *loadcell_handle) {
     return ESP_OK;
 }
 
-static esp_err_t transducer_init(ads1256_handle_t *trans_handle) {
-    esp_err_t err;
-
-    /* Pressure Transducer struct setup */
-    ads1256_config_t trans_cfg = {
-        .spi_host        = SPI_HOST,
-        .cs              = TRANS_CS,
-        .drdy            = TRANS_DRDY,
-        .gain            = ADS1256_GAIN_1,
-        .drate           = ADS1256_DRATE_1000SPS,
-        .pos_channel     = ADS1256_MUX_AIN0,
-        .neg_channel     = ADS1256_MUX_AIN1,
-        .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
-        .bufen           = false,
-        .spi_mutex       = xSPIMutex,
-    };
-
-    /* Pressure Transducer initialization */
-    err = ads1256_init(&trans_cfg, trans_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG_ADS, "ADS2 init failed: %s", esp_err_to_name(err));
-        return err;
-    }
-
-    ESP_LOGI(TAG_ADS, "ADS2 initialized");
-    return ESP_OK;
-}
-
 void task_ads(void *pvParameters) {
     esp_err_t err;
 
     ads1256_handle_t loadcell_handle;
-    ads1256_handle_t transducer_handle;
 
     int32_t current_thrust_raw;
-    int32_t current_pressure_raw;
 
     err = loadcell_init(&loadcell_handle);
-    if (err != ESP_OK) {
-        goto setup_error;
-    }
-
-    err = transducer_init(&transducer_handle);
     if (err != ESP_OK) {
         goto setup_error;
     }
@@ -124,30 +89,22 @@ void task_ads(void *pvParameters) {
 
         /* ADS Synchronization */
         gpio_set_level(LOADCELL_SYNC, LOW);
-        gpio_set_level(TRANS_SYNC, LOW);
         ets_delay_us(ADS1256_T11_SYNC_US);
         gpio_set_level(LOADCELL_SYNC, HIGH);
-        gpio_set_level(TRANS_SYNC, HIGH);
 
         /* Wait DRDY */
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
-        /* Load Cell + Pressure Transducer reading */
+        /* Load Cell reading */
         // err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
         err = ads1256_read_continuous(loadcell_handle, &current_thrust_raw);
         if (err != ESP_OK)
             sys_data_g.ads_lost++;
 
-        // err = ads1256_read_result(transducer_handle, &current_pressure_raw);
-        err = ads1256_read_continuous(transducer_handle, &current_pressure_raw);
-        if (err != ESP_OK)
-            sys_data_g.ads_lost++;
-
         /* Create ads sample */
         ads_data_t sample = {
-            .timestamp    = (uint32_t)esp_timer_get_time(),
-            .thrust_raw   = current_thrust_raw,
-            .pressure_raw = current_pressure_raw,
+            .timestamp  = (uint32_t)esp_timer_get_time(),
+            .thrust_raw = current_thrust_raw,
         };
 
         /* Copy sample to PSRAM */
@@ -159,10 +116,8 @@ void task_ads(void *pvParameters) {
 
 cleanup:
     ads1256_send_cmd(loadcell_handle, ADS1256_CMD_SDATAC);
-    ads1256_send_cmd(transducer_handle, ADS1256_CMD_SDATAC);
 
     ads1256_delete(loadcell_handle);
-    ads1256_delete(transducer_handle);
 
     gpio_intr_disable(LOADCELL_DRDY);
     gpio_isr_handler_remove(LOADCELL_DRDY);

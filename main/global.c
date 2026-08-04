@@ -8,7 +8,6 @@ file_counter_t file_counter_g = {0};
 
 /* QUEUE HANDLE*/
 QueueHandle_t xEventQueue = NULL;
-QueueHandle_t xTelemQueue = NULL;
 
 /* SEMAPHORE */
 SemaphoreHandle_t xSPIMutex = NULL;

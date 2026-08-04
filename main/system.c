@@ -85,11 +85,6 @@ static esp_err_t setup_peripherals(void) {
     gpio_set_direction(LOADCELL_SYNC, GPIO_MODE_OUTPUT);
     gpio_set_level(LOADCELL_SYNC, HIGH);
 
-    /* Set to LOW:delay:HIGH before asking for data */
-    gpio_reset_pin(TRANS_SYNC);
-    gpio_set_direction(TRANS_SYNC, GPIO_MODE_OUTPUT);
-    gpio_set_level(TRANS_SYNC, HIGH);
-
     /* DRDY config with ISR */
     gpio_config_t drdy_conf = {
         .pin_bit_mask = (1ULL << LOADCELL_DRDY),
@@ -99,25 +94,10 @@ static esp_err_t setup_peripherals(void) {
         .intr_type    = GPIO_INTR_NEGEDGE // Trigger when DRDY goes LOW
     };
 
-    /* DIO1 config with ISR */
-    gpio_config_t dio1_conf = {
-        .pin_bit_mask = (1ULL << LORA_DIO1),
-        .mode         = GPIO_MODE_INPUT,
-        .pull_up_en   = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type    = GPIO_INTR_POSEDGE // Trigger when DIO1 goes HIGH
-    };
-
     /* Apply ISR */
     err = gpio_config(&drdy_conf);
     if (err != ESP_OK) {
         ESP_LOGE(TAG_SYS, "DRDY config failed: %s", esp_err_to_name(err));
-        return err;
-    }
-
-    err = gpio_config(&dio1_conf);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "DIO1 config failed: %s", esp_err_to_name(err));
         return err;
     }
 
@@ -128,8 +108,6 @@ static esp_err_t setup_peripherals(void) {
     }
 
     if (xEventQueue == NULL)
-        return ESP_ERR_INVALID_ARG;
-    if (xTelemQueue == NULL)
         return ESP_ERR_INVALID_ARG;
     if (xSPIMutex == NULL)
         return ESP_ERR_INVALID_ARG;
@@ -300,14 +278,8 @@ void task_status(void *pvParameters) {
             break;
 
         case EVT_NVS_DONE:
-            ESP_LOGI(TAG_SYS, "NVS_EDIT -> SEND_DATA");
+            ESP_LOGI(TAG_SYS, "NVS_EDIT -> END_TEST");
             xEventGroupClearBits(xStatusEventGroup, NVS_EDIT);
-            xEventGroupSetBits(xStatusEventGroup, SEND_DATA);
-            break;
-
-        case EVT_SEND_DONE:
-            ESP_LOGI(TAG_SYS, "SEND_DATA -> END_TEST");
-            xEventGroupClearBits(xStatusEventGroup, SEND_DATA);
             xEventGroupSetBits(xStatusEventGroup, END_TEST);
             ESP_LOGI(TAG_SYS, "Test complete.");
             break;

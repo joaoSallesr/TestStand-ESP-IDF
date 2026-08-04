@@ -34,7 +34,6 @@
 #include "esp_ads1256.h"
 #include "esp_littlefs.h"
 #include "max6675.h"
-#include "ra01s.h"
 
 #define LOW  0
 #define HIGH 1
@@ -55,17 +54,10 @@
 #define LOADCELL_CS   GPIO_NUM_8
 #define LOADCELL_DRDY GPIO_NUM_21
 #define LOADCELL_SYNC GPIO_NUM_9
-#define TRANS_CS      GPIO_NUM_42
-#define TRANS_DRDY    GPIO_NUM_10
-#define TRANS_SYNC    GPIO_NUM_47
 #define MAX1_CS       GPIO_NUM_16
 #define MAX2_CS       GPIO_NUM_17
 #define MAX3_CS       GPIO_NUM_18
 #define MAX3_DRDY     GPIO_NUM_6
-#define LORA_CS       GPIO_NUM_14
-#define LORA_DIO1     GPIO_NUM_2 // LORA_DRDY
-#define LORA_BUSY     GPIO_NUM_41
-#define LORA_RESET    GPIO_NUM_40
 
 /* SPI CONFIG */
 #define SPI_HOST SPI2_HOST
@@ -93,7 +85,6 @@
 #define LFS_DONE    BIT(8)
 #define SAVE_DATA   BIT(9)
 #define NVS_EDIT    BIT(10)
-#define SEND_DATA   BIT(11)
 #define END_TEST    BIT(12)
 
 /* INIT FLAGS */
@@ -101,53 +92,20 @@
 #define MAX_INIT BIT(1)
 #define SD_INIT  BIT(2)
 #define LFS_INIT BIT(3)
-// #define LORA_INIT BIT(4)
 
 #define SETUP_INIT (ADS_INIT | MAX_INIT | SD_INIT | LFS_INIT)
 
 /* SAMPLE STRUCTURES */
 typedef struct __attribute__((packed)) {
-    uint32_t timestamp;    // 4 Bytes
-    int32_t  thrust_raw;   // 4 Bytes
-    int32_t  pressure_raw; // 4 Bytes
-} ads_data_t;              // 12 Bytes
+    uint32_t timestamp;  // 4 Bytes
+    int32_t  thrust_raw; // 4 Bytes
+} ads_data_t;            // 8 Bytes
 
 typedef struct __attribute__((packed)) {
     uint32_t timestamp;        // 4 Bytes
     uint16_t temperature1_raw; // 2 Bytes
     uint16_t temperature2_raw; // 2 Bytes
 } max_data_t;                  // 8 Bytes
-
-/* TELEMETRY STRUCTURES */
-typedef enum __attribute__((packed)) {
-    PKT_EVT  = 0x01,
-    PKT_ACK  = 0x02,
-    PKT_INFO = 0x03,
-    PKT_ADS  = 0x04,
-    PKT_MAX  = 0x05,
-    PKT_FAIL = 0x06,
-} packet_type_t; // 1 byte
-
-typedef struct __attribute__((packed)) {
-    packet_type_t type; // 1 byte
-    uint16_t      seq;  // 2 bytes
-} packet_header_t;      // 3 bytes
-
-typedef struct __attribute__((packed)) {
-    packet_type_t type;      // 1 byte
-    uint32_t      timestamp; // 4 bytes
-    char          msg[11];   // 11 bytes
-} msg_packet_t;              // 16 bytes
-
-typedef struct __attribute__((packed)) {
-    packet_header_t header; // 3 bytes
-    ads_data_t      data;   // 12 Bytes
-} ads_packet_t;             // 15 bytes
-
-typedef struct __attribute__((packed)) {
-    packet_header_t header; // 3 bytes
-    max_data_t      data;   // 8 Bytes
-} max_packet_t;             // 11 bytes
 
 /* SYSTEM STRUCTURES */
 typedef struct __attribute__((packed)) {
@@ -183,7 +141,6 @@ typedef enum __attribute__((packed)) {
     EVT_MAX_DONE,      // task_max finished
     EVT_ACQUIRE_DONE,  // acquisition finished
     EVT_SAVE_DONE,     // sd and lfs finished writing
-    EVT_SEND_DONE,     // task_lora finished sending
     EVT_NVS_DONE,      // task_nvs finished
 } status_event_t;
 

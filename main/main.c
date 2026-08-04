@@ -3,14 +3,12 @@
 static const char *TAG_MAIN = "main";
 
 #define EVENT_QUEUE_SIZE 10
-#define TELEM_QUEUE_SIZE 16
 
 void app_main(void) {
     ESP_LOGI(TAG_MAIN, "Starting main application");
 
     /* Create Queue */
     xEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(status_event_t));
-    xTelemQueue = xQueueCreate(TELEM_QUEUE_SIZE, sizeof(msg_packet_t));
 
     /* Create mutex */
     xSPIMutex = xSemaphoreCreateMutex();
@@ -32,7 +30,6 @@ void app_main(void) {
     xTaskCreatePinnedToCore(task_sd, "SD", configMINIMAL_STACK_SIZE * 8, NULL, 8, NULL, 1);
     xTaskCreatePinnedToCore(task_lfs, "LittleFS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(task_nvs, "NVS", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, 1);
-    // xTaskCreatePinnedToCore(task_lora, "LoRa", configMINIMAL_STACK_SIZE * 8, NULL, 3, &xTaskLora, 1);
 
     // ==========================================================================
     // task log ?

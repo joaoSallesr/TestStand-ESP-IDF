@@ -10,7 +10,6 @@ extern file_counter_t file_counter_g;
 
 /* QUEUE HANDLE*/
 extern QueueHandle_t xEventQueue;
-extern QueueHandle_t xTelemQueue;
 
 /* SEMAPHORE */
 extern SemaphoreHandle_t xSPIMutex;
@@ -37,6 +36,3 @@ void task_lfs(void *pvParameters);
 void task_nvs(void *pvParameters);
 void task_lora(void *pvParameters);
 void task_log(void *pvParameters);
-
-/* GLOBAL FUNCTIONS */
-void telem_post(packet_type_t type, const char *msg);
