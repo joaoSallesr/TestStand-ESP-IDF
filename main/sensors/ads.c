@@ -16,10 +16,10 @@ bool ads_check(int64_t ads_start) {
     bool buffer_full  = sys_data_g.ads_sample >= ADS_SAMPLES;
     bool time_elapsed = (esp_timer_get_time() - ads_start) >= (ADS_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
+    if ((xEventGroupGetBits(xStatusEventGroup) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_ADS_DONE;
-            xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+            xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_ADS, "ADS acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
@@ -43,6 +43,7 @@ static esp_err_t loadcell_init(ads1256_handle_t *loadcell_handle) {
         .neg_channel     = ADS1256_MUX_AIN1,
         .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
+        .spi_mutex       = xSPIMutex,
     };
 
     /* Load Cell initialization */
@@ -70,6 +71,7 @@ static esp_err_t transducer_init(ads1256_handle_t *trans_handle) {
         .neg_channel     = ADS1256_MUX_AIN1,
         .drdy_timeout_ms = ADS_INIT_TIMEOUT_MS,
         .bufen           = false,
+        .spi_mutex       = xSPIMutex,
     };
 
     /* Pressure Transducer initialization */
@@ -110,8 +112,8 @@ void task_ads(void *pvParameters) {
     }
 
     /* ADS initialized -> Wait for acquisition to start */
-    xEventGroupSetBits(xInitEvent, ADS_INIT);
-    xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(xInitEventGroup, ADS_INIT);
+    xEventGroupWaitBits(xStatusEventGroup, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t ads_start = esp_timer_get_time();
 
@@ -131,11 +133,13 @@ void task_ads(void *pvParameters) {
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADS_DRDY_TIMEOUT_MS));
 
         /* Load Cell + Pressure Transducer reading */
-        err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        // err = ads1256_read_result(loadcell_handle, &current_thrust_raw);
+        err = ads1256_read_continuous(loadcell_handle, &current_thrust_raw);
         if (err != ESP_OK)
             sys_data_g.ads_lost++;
 
-        err = ads1256_read_result(transducer_handle, &current_pressure_raw);
+        // err = ads1256_read_result(transducer_handle, &current_pressure_raw);
+        err = ads1256_read_continuous(transducer_handle, &current_pressure_raw);
         if (err != ESP_OK)
             sys_data_g.ads_lost++;
 
@@ -154,6 +158,9 @@ void task_ads(void *pvParameters) {
     ESP_LOGE(TAG_ADS, "Lost Samples/Read Samples : %d/%d", sys_data_g.ads_lost, sys_data_g.ads_sample);
 
 cleanup:
+    ads1256_send_cmd(loadcell_handle, ADS1256_CMD_SDATAC);
+    ads1256_send_cmd(transducer_handle, ADS1256_CMD_SDATAC);
+
     ads1256_delete(loadcell_handle);
     ads1256_delete(transducer_handle);
 
@@ -164,7 +171,7 @@ cleanup:
 
 setup_error: {
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 }
     goto cleanup;
 }

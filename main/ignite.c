@@ -5,38 +5,38 @@ static const char *TAG_IGN = "ignition";
 void task_ignite(void *pvParameters) {
 
     /* Wait for armed */
-    xEventGroupWaitBits(xStatusEvent, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
-
-    // TODO:
-    // Estourar o Squib ao receber sinal IGNITION da base
-    // Ao receber o sinal envia EVT_IGNITION_START
+    xEventGroupWaitBits(xStatusEventGroup, ARMED, pdFALSE, pdTRUE, portMAX_DELAY);
 
     while (true) {
-        ignition_event_t evt;
+        uint32_t cmd;
 
         /* Wait for ignition */
-        if (xQueueReceive(xIgnitionQueue, &evt, portMAX_DELAY) != pdTRUE)
-            continue;
+        xTaskNotifyWait(0, 0xFFFFFFFF, &cmd, portMAX_DELAY);
 
-        if (evt == EVT_IGNITION_START) {
+        if (cmd == EVT_IGNITION_START) {
+            bool ignited = false;
+
             for (int i = 0; i < 3; i++) {
                 ESP_LOGW(TAG_IGN, "IGNITION STARTED");
 
                 gpio_set_level(IGNITION_GPIO, HIGH);
-                vTaskDelay(pdMS_TO_TICKS(1)); // 1 ?
+                vTaskDelay(pdMS_TO_TICKS(1)); // TESTAR ==============================================
                 gpio_set_level(IGNITION_GPIO, LOW);
 
-                if (gpio_get_level(SQUIB_GPIO) == LOW)
+                if (gpio_get_level(SQUIB_GPIO) == LOW) {
+                    ignited = true;
                     break;
+                }
             }
 
-            if (gpio_get_level(SQUIB_GPIO) == LOW)
+            if (ignited) {
+                xTaskNotify(xTaskLora, EVT_IGNITION_SUCCESS, eSetValueWithOverwrite);
                 break;
+            } else {
+                xTaskNotify(xTaskLora, EVT_IGNITION_FAILED, eSetValueWithOverwrite);
+            }
         }
     }
-
-    status_event_t evt = EVT_IGNITION_DONE;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
 }

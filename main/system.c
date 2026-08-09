@@ -65,11 +65,11 @@ static esp_err_t setup_peripherals(void) {
 
     err = spi_bus_initialize(host, &spi_bus_cfg, dma_chan);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG_SYS, "SPI initialization failed: %s", esp_err_to_name(err));
         return err;
     }
 
-    /* GPIO Initalization */
+    /* GPIO initialization */
     gpio_reset_pin(BUZZER_GPIO);
     gpio_set_direction(BUZZER_GPIO, GPIO_MODE_OUTPUT);
 
@@ -111,29 +111,31 @@ static esp_err_t setup_peripherals(void) {
     /* Apply ISR */
     err = gpio_config(&drdy_conf);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG_SYS, "DRDY config failed: %s", esp_err_to_name(err));
         return err;
     }
 
     err = gpio_config(&dio1_conf);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG_SYS, "DIO1 config failed: %s", esp_err_to_name(err));
         return err;
     }
 
     err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG_SYS, "Setup Peripherals failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG_SYS, "ISR install failed: %s", esp_err_to_name(err));
         return err;
     }
 
-    if (xStatusQueue == NULL)
+    if (xEventQueue == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (xIgnitionQueue == NULL)
+    if (xTelemQueue == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (xStatusEvent == NULL)
+    if (xSPIMutex == NULL)
         return ESP_ERR_INVALID_ARG;
-    if (xInitEvent == NULL)
+    if (xStatusEventGroup == NULL)
+        return ESP_ERR_INVALID_ARG;
+    if (xInitEventGroup == NULL)
         return ESP_ERR_INVALID_ARG;
 
     return err;
@@ -203,11 +205,11 @@ void task_setup(void *pvParameters) {
     }
 
     EventBits_t init_bits =
-        xEventGroupWaitBits(xInitEvent, SETUP_INIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(SETUP_TIMEOUT_MS));
+        xEventGroupWaitBits(xInitEventGroup, SETUP_INIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(SETUP_TIMEOUT_MS));
 
     if ((init_bits & SETUP_INIT) == SETUP_INIT) {
         status_event_t evt = EVT_SETUP_OK;
-        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     } else {
         goto setup_error;
     }
@@ -216,7 +218,7 @@ void task_setup(void *pvParameters) {
 
 setup_error: {
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 }
     vTaskDelete(NULL);
 }
@@ -225,88 +227,88 @@ void task_status(void *pvParameters) {
     status_event_t evt;
 
     while (true) {
-        if (xQueueReceive(xStatusQueue, &evt, portMAX_DELAY) != pdTRUE)
+        if (xQueueReceive(xEventQueue, &evt, portMAX_DELAY) != pdTRUE)
             continue;
 
         switch (evt) {
 
         case EVT_INIT_READY:
             ESP_LOGI(TAG_SYS, "TASK_INIT");
-            xEventGroupSetBits(xStatusEvent, TASK_INIT);
+            xEventGroupSetBits(xStatusEventGroup, TASK_INIT);
             break;
 
         case EVT_SETUP_OK:
             ESP_LOGI(TAG_SYS, "TASK_INIT -> SETUP_OK");
-            xEventGroupClearBits(xStatusEvent, TASK_INIT);
-            xEventGroupSetBits(xStatusEvent, SETUP_OK);
+            xEventGroupClearBits(xStatusEventGroup, TASK_INIT);
+            xEventGroupSetBits(xStatusEventGroup, SETUP_OK);
             break;
 
         case EVT_SETUP_FAILED:
             ESP_LOGI(TAG_SYS, "TASK_INIT -> FATAL_ERROR");
-            xEventGroupClearBits(xStatusEvent, TASK_INIT);
-            xEventGroupSetBits(xStatusEvent, FATAL_ERROR);
+            xEventGroupClearBits(xStatusEventGroup, TASK_INIT);
+            xEventGroupSetBits(xStatusEventGroup, FATAL_ERROR);
             break;
 
         case EVT_ARM:
             ESP_LOGI(TAG_SYS, "SETUP_OK -> ARMED");
-            xEventGroupClearBits(xStatusEvent, SETUP_OK);
-            xEventGroupSetBits(xStatusEvent, ARMED);
+            xEventGroupClearBits(xStatusEventGroup, SETUP_OK);
+            xEventGroupSetBits(xStatusEventGroup, ARMED);
             break;
 
         case EVT_IGNITION_DONE:
             ESP_LOGI(TAG_SYS, "ARMED -> ACQUIRE");
-            xEventGroupClearBits(xStatusEvent, ARMED);
-            xEventGroupSetBits(xStatusEvent, ACQUIRE);
+            xEventGroupClearBits(xStatusEventGroup, ARMED);
+            xEventGroupSetBits(xStatusEventGroup, ACQUIRE);
             break;
 
         case EVT_ADS_DONE: {
             ESP_LOGI(TAG_SYS, "ACQUIRE + ADS_DONE");
-            EventBits_t bits = xEventGroupSetBits(xStatusEvent, ADS_DONE);
+            EventBits_t bits = xEventGroupSetBits(xStatusEventGroup, ADS_DONE);
 
             if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
                 status_event_t evt = EVT_ACQUIRE_DONE;
-                xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             }
             break;
         }
 
         case EVT_MAX_DONE: {
             ESP_LOGI(TAG_SYS, "ACQUIRE + MAX_DONE");
-            EventBits_t bits = xEventGroupSetBits(xStatusEvent, MAX_DONE);
+            EventBits_t bits = xEventGroupSetBits(xStatusEventGroup, MAX_DONE);
 
             if ((bits & (ADS_DONE | MAX_DONE)) == (ADS_DONE | MAX_DONE)) {
                 status_event_t evt = EVT_ACQUIRE_DONE;
-                xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+                xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             }
             break;
         }
 
         case EVT_ACQUIRE_DONE:
             ESP_LOGI(TAG_SYS, "ACQUIRE -> SAVE_DATA");
-            xEventGroupClearBits(xStatusEvent, ACQUIRE);
-            xEventGroupClearBits(xStatusEvent, ADS_DONE);
-            xEventGroupClearBits(xStatusEvent, MAX_DONE);
-            xEventGroupSetBits(xStatusEvent, SAVE_DATA);
+            xEventGroupClearBits(xStatusEventGroup, ACQUIRE);
+            xEventGroupClearBits(xStatusEventGroup, ADS_DONE);
+            xEventGroupClearBits(xStatusEventGroup, MAX_DONE);
+            xEventGroupSetBits(xStatusEventGroup, SAVE_DATA);
             break;
 
         case EVT_SAVE_DONE:
             ESP_LOGI(TAG_SYS, "SAVE_DATA -> NVS_EDIT");
-            xEventGroupClearBits(xStatusEvent, SAVE_DATA);
-            xEventGroupClearBits(xStatusEvent, SD_DONE);
-            xEventGroupClearBits(xStatusEvent, LFS_DONE);
-            xEventGroupSetBits(xStatusEvent, NVS_EDIT);
+            xEventGroupClearBits(xStatusEventGroup, SAVE_DATA);
+            xEventGroupClearBits(xStatusEventGroup, SD_DONE);
+            xEventGroupClearBits(xStatusEventGroup, LFS_DONE);
+            xEventGroupSetBits(xStatusEventGroup, NVS_EDIT);
             break;
 
         case EVT_NVS_DONE:
             ESP_LOGI(TAG_SYS, "NVS_EDIT -> SEND_DATA");
-            xEventGroupClearBits(xStatusEvent, NVS_EDIT);
-            xEventGroupSetBits(xStatusEvent, SEND_DATA);
+            xEventGroupClearBits(xStatusEventGroup, NVS_EDIT);
+            xEventGroupSetBits(xStatusEventGroup, SEND_DATA);
             break;
 
         case EVT_SEND_DONE:
             ESP_LOGI(TAG_SYS, "SEND_DATA -> END_TEST");
-            xEventGroupClearBits(xStatusEvent, SEND_DATA);
-            xEventGroupSetBits(xStatusEvent, END_TEST);
+            xEventGroupClearBits(xStatusEventGroup, SEND_DATA);
+            xEventGroupSetBits(xStatusEventGroup, END_TEST);
             ESP_LOGI(TAG_SYS, "Test complete.");
             break;
         }
@@ -315,7 +317,7 @@ void task_status(void *pvParameters) {
 
 void task_arm(void *pvParameters) {
     /* Wait for idle */
-    EventBits_t bits = xEventGroupWaitBits(xStatusEvent, SETUP_OK | FATAL_ERROR, pdFALSE, pdFALSE, portMAX_DELAY);
+    EventBits_t bits = xEventGroupWaitBits(xStatusEventGroup, SETUP_OK | FATAL_ERROR, pdFALSE, pdFALSE, portMAX_DELAY);
 
     /* Check before Arming */
     if (bits & FATAL_ERROR) {
@@ -328,7 +330,7 @@ void task_arm(void *pvParameters) {
     if (bits & SETUP_OK) {
         ESP_LOGW(TAG_SYS, "SYSTEM ARMED");
         status_event_t evt = EVT_ARM;
-        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
     vTaskDelete(NULL);

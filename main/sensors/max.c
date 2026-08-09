@@ -8,10 +8,10 @@ bool max_check(int64_t max_start) {
     bool buffer_full  = sys_data_g.max_sample >= MAX_SAMPLES;
     bool time_elapsed = (esp_timer_get_time() - max_start) >= (MAX_ACQ_DURATION_MS * 1000);
 
-    if ((xEventGroupGetBits(xStatusEvent) & ACQUIRE)) {
+    if ((xEventGroupGetBits(xStatusEventGroup) & ACQUIRE)) {
         if (buffer_full || time_elapsed) {
             status_event_t evt = EVT_MAX_DONE;
-            xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+            xQueueSend(xEventQueue, &evt, portMAX_DELAY);
             ESP_LOGI(TAG_MAX, "MAX acquisition stopped: %s", buffer_full ? "buffer full" : "time elapsed");
 
             return true;
@@ -26,8 +26,9 @@ static esp_err_t max_init(max6675_handle_t *max_handle, gpio_num_t cs_num) {
 
     /* MAX6675 struct setup */
     max6675_config_t max_cfg = {
-        .spi_host = SPI_HOST,
-        .cs       = cs_num,
+        .spi_host  = SPI_HOST,
+        .cs        = cs_num,
+        .spi_mutex = xSPIMutex,
     };
 
     /* MAX initialization */
@@ -61,8 +62,8 @@ void task_max(void *pvParameters) {
     }
 
     /* MAX initialized -> Wait for acquisition to start */
-    xEventGroupSetBits(xInitEvent, MAX_INIT);
-    xEventGroupWaitBits(xStatusEvent, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(xInitEventGroup, MAX_INIT);
+    xEventGroupWaitBits(xStatusEventGroup, ACQUIRE, pdFALSE, pdTRUE, portMAX_DELAY);
 
     int64_t max_start = esp_timer_get_time();
 
@@ -105,7 +106,7 @@ cleanup:
 
 setup_error: {
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 }
 
     goto cleanup;

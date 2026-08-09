@@ -79,8 +79,8 @@ void task_sd(void *pvParameters) {
     }
 
     /* SD initialized -> Wait for SAVE_DATA */
-    xEventGroupSetBits(xInitEvent, SD_INIT);
-    xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(xInitEventGroup, SD_INIT);
+    xEventGroupWaitBits(xStatusEventGroup, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
@@ -170,10 +170,10 @@ cleanup:
     esp_vfs_fat_sdcard_unmount(SD_MOUNT, card);
     ESP_LOGI(TAG_SD, "Card unmounted");
 
-    EventBits_t bits = xEventGroupSetBits(xStatusEvent, SD_DONE);
+    EventBits_t bits = xEventGroupSetBits(xStatusEventGroup, SD_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         status_event_t evt = EVT_SAVE_DONE;
-        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
     vTaskDelete(NULL);
@@ -187,7 +187,7 @@ setup_error:
     }
 
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
 
@@ -252,8 +252,8 @@ void task_lfs(void *pvParameters) {
     }
 
     /* LittleFS initialized -> Wait for SAVE_DATA */
-    xEventGroupSetBits(xInitEvent, LFS_INIT);
-    xEventGroupWaitBits(xStatusEvent, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupSetBits(xInitEventGroup, LFS_INIT);
+    xEventGroupWaitBits(xStatusEventGroup, SAVE_DATA, pdFALSE, pdTRUE, portMAX_DELAY);
 
     uint32_t ads_total = sys_data_g.ads_sample;
     uint32_t max_total = sys_data_g.max_sample;
@@ -344,10 +344,10 @@ cleanup:
     esp_vfs_littlefs_unregister(littlefs_cfg.partition_label);
     ESP_LOGI(TAG_LFS, "LittleFS unmounted");
 
-    EventBits_t bits = xEventGroupSetBits(xStatusEvent, LFS_DONE);
+    EventBits_t bits = xEventGroupSetBits(xStatusEventGroup, LFS_DONE);
     if ((bits & (SD_DONE | LFS_DONE)) == (SD_DONE | LFS_DONE)) {
         status_event_t evt = EVT_SAVE_DONE;
-        xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+        xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     }
 
     vTaskDelete(NULL);
@@ -361,7 +361,7 @@ setup_error:
     }
 
     status_event_t evt = EVT_SETUP_FAILED;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
 
     vTaskDelete(NULL);
 
@@ -374,7 +374,7 @@ void task_nvs(void *pvParameters) {
     nvs_handle_t nvs_handle;
 
     /* Wait for SAVE_DONE */
-    xEventGroupWaitBits(xStatusEvent, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    xEventGroupWaitBits(xStatusEventGroup, NVS_EDIT, pdFALSE, pdTRUE, portMAX_DELAY);
     ESP_LOGI(TAG_NVS, "Starting NVS file counter update");
     nvs_open("storage", NVS_READWRITE, &nvs_handle);
 
@@ -392,6 +392,6 @@ void task_nvs(void *pvParameters) {
     ESP_LOGI(TAG_NVS, "NVS file counter updated");
 
     status_event_t evt = EVT_NVS_DONE;
-    xQueueSend(xStatusQueue, &evt, portMAX_DELAY);
+    xQueueSend(xEventQueue, &evt, portMAX_DELAY);
     vTaskDelete(NULL);
 }
